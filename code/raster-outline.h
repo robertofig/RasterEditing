@@ -10,15 +10,9 @@ enum edge_type
     EdgeType_None = 4
 };
 
-#define EDGE_LIST_START_SIZE Kilobyte(64)
-#define RING_LIST_START_SIZE Kilobyte(4)
+#define EDGE_DATA_START_SIZE Kilobyte(64)
 
 typedef edge_type (*test_block)(u8*, u8*, double);
-struct dtype_info
-{
-    int Size;
-    test_block Func;
-};
 
 struct edge
 {
@@ -43,6 +37,16 @@ struct sweep_line
     int Width;
     u8* First;
     u8* Second;
+    test_block TestBlock;
+    double NoData;
+};
+
+struct edge_arena
+{
+    buffer* Arena;
+    
+    u32 ColHashTableSize;
+    u32 LineSweepSize;
 };
 
 struct ring_info

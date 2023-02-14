@@ -115,19 +115,35 @@ _TestBlockF64(u8* _TopRow, u8* _BottomRow, double _NoData)
     return EdgeType_None;
 }
 
-internal dtype_info
-GetDTypeInfo(GDALDataType DType)
+internal usz
+GetDTypeSize(GDALDataType DType)
 {
     switch (DType)
     {
-        case GDT_Byte:    return { 1, _TestBlockU8 };
+        case GDT_Byte:    return 1;
         case GDT_UInt16:
-        case GDT_Int16:   return { 2, _TestBlockU16 };
+        case GDT_Int16:   return 2;
         case GDT_UInt32:
-        case GDT_Int32:   return { 4, _TestBlockU32 };
-        case GDT_Float32: return { 4, _TestBlockF32 };
-        case GDT_Float64: return { 8, _TestBlockF64 };
-        default:          return { 0, NULL };
+        case GDT_Int32:
+        case GDT_Float32: return 4;
+        case GDT_Float64: return 8;
+        default:          return 0;
+    }
+}
+
+internal test_block
+GetTestBlockCallback(GDALDataType DType)
+{
+    switch (DType)
+    {
+        case GDT_Byte:    return _TestBlockU8 ;
+        case GDT_UInt16:
+        case GDT_Int16:   return _TestBlockU16 ;
+        case GDT_UInt32:
+        case GDT_Int32:   return _TestBlockU32;
+        case GDT_Float32: return _TestBlockF32;
+        case GDT_Float64: return _TestBlockF64;
+        default:          return NULL;
     }
 }
 
@@ -182,39 +198,39 @@ SetNoDataLine(u8* Line, int Width, double NoData, GDALDataType DType)
 }
 
 internal bool
-ProcessSweepLine(sweep_line Line, test_block TestBlock, double NoData, int Row, buffer* EdgeList, u32* ColHashTable)
+ProcessSweepLine(sweep_line Line, int Row, buffer* EdgeData, u32* ColHashTable)
 {
     for (int Col = 0; Col < Line.Width-1; Col++)
     {
-        edge_type Type = TestBlock(Line.First + Col, Line.Second + Col, NoData);
+        edge_type Type = Line.TestBlock(Line.First + Col, Line.Second + Col, Line.NoData);
         if (Type != EdgeType_None)
         {
-            edge* NewEdge = PushStruct(EdgeList, edge);
-            if (!NewEdge)
+            u32 NewEdgeIdx = (EdgeData->WriteCur + 1) / sizeof(edge);
+            usz SortedEdgesSize = NewEdgeIdx * sizeof(u32);
+            usz RequiredSize = EdgeData->WriteCur + sizeof(edge) + SortedEdgesSize;
+            
+            if (RequiredSize > EdgeData->Size)
             {
-                // TODO: Allocated more space.
-                usz NewAllocSize = EdgeList->Size * 2;
-                u8* NewAlloc = (u8*)GetMemory(NewAllocSize, 0, MEM_READ|MEM_WRITE);
+                usz NewAllocSize = RequiredSize * 2;
+                u8* NewAlloc = (u8*)GetMemory(NewAllocSize, 0, MEM_WRITE);
                 if (!NewAlloc)
                 {
                     return false;
                 }
-                CopyData(NewAlloc, NewAllocSize, EdgeList->Base, EdgeList->WriteCur);
-                FreeMemory(EdgeList->Base);
+                CopyData(NewAlloc, NewAllocSize, EdgeData->Base, EdgeData->WriteCur);
+                FreeMemory(EdgeData->Base);
                 
-                EdgeList->Base = NewAlloc;
-                EdgeList->Size = NewAllocSize;
-                NewEdge = PushStruct(EdgeList, edge);
+                EdgeData->Base = NewAlloc;
+                EdgeData->Size = NewAllocSize;
             }
-            *NewEdge = { Type, Row, Col, 0, 0 };
             
-            edge* EdgeData = (edge*)EdgeList->Base;
-            int NewEdgeIdx = NewEdge - EdgeData;
+            edge* NewEdge = PushStruct(EdgeData, edge);
+            *NewEdge = { Type, Row, Col, 0, 0 };
             
             i32 AboveEdgeIdx = ColHashTable[Col];
             if (AboveEdgeIdx > 0)
             {
-                edge* AboveEdge = &EdgeData[AboveEdgeIdx];
+                edge* AboveEdge = (edge*)EdgeData->Base + AboveEdgeIdx;
                 NewEdge->Above = AboveEdgeIdx;
                 AboveEdge->Below = NewEdgeIdx;
             }
@@ -238,10 +254,10 @@ GetLineDirection(line_dir PrevDir, edge* Edge)
 }
 
 internal void
-WriteVertexPair(ring_info* Ring, double* Affine, edge* EdgeData, u32* EdgeIdx)
+WriteVertexPair(ring_info* Ring, double* Affine, edge* EdgeList, u32* EdgeIdx)
 {
-    edge* FirstEdge = &EdgeData[EdgeIdx[0]];
-    edge* SecondEdge = &EdgeData[EdgeIdx[1]];
+    edge* FirstEdge = &EdgeList[EdgeIdx[0]];
+    edge* SecondEdge = &EdgeList[EdgeIdx[1]];
     
     f64 X = Affine[0] + Affine[1] * FirstEdge->Col;
     f64 Y = Affine[3] + Affine[5] * FirstEdge->Row;
@@ -328,19 +344,28 @@ RasterToOutline(char* SrcRasterPath)
     
     if (RasterHasNoData)
     {
-        buffer EdgeList = Buffer(GetMemory(EDGE_LIST_START_SIZE, 0, MEM_READ|MEM_WRITE), 0, EDGE_LIST_START_SIZE);
-        if (!EdgeList.Base)
-        {
-            return Poly;
-        }
-        edge* NullEdge = PushStruct(&EdgeList, edge); // Zeroed default struct.
+        int InspectWidth = Width + 2; // One extra pixel on the left and right, to guard from overflow.
+        int InspectHeight = Height + 2; // One extra row on top and bottom, to guard from overflow.
+        usz DTypeSize = GetDTypeSize(DType);
+        test_block TestBlock = GetTestBlockCallback(DType);
         
         usz ColHashTableSize = Width * sizeof(u32);
-        u32* ColHashTable = (u32*)GetMemory(ColHashTableSize, 0, MEM_READ|MEM_WRITE);
-        if (!ColHashTable)
+        usz LineSweepSize = InspectWidth * DTypeSize * 2;
+        usz LineDataSize = ColHashTableSize + LineSweepSize;
+        
+        u8* LineDataMem = (u8*)GetMemory(LineDataSize, 0, MEM_WRITE);
+        u8* EdgeDataMem = (u8*)GetMemory(EDGE_DATA_START_SIZE, 0, MEM_WRITE);
+        if (!(LineDataMem && EdgeDataMem))
         {
             return Poly;
         }
+        
+        u32* ColHashTable = (u32*)LineDataMem;
+        u8* FirstLine = LineDataMem + ColHashTableSize;
+        u8* SecondLine = FirstLine + (InspectWidth * DTypeSize);
+        
+        buffer EdgeData = Buffer(EdgeDataMem, 0, Align(EDGE_DATA_START_SIZE, gSysInfo.PageSize));
+        edge* NullEdge = PushStruct(&EdgeData, edge); // Zeroed default struct.
         
         StopTiming(&Trace);
         fprintf(stdout, "Init setup: %f\n", Trace.Diff);
@@ -348,26 +373,18 @@ RasterToOutline(char* SrcRasterPath)
         
         // Get edges line by line.
         
-        int InspectWidth = Width + 2; // One extra pixel on the left and right, to guard from overflow.
-        int InspectHeight = Height + 2; // One extra row on top and bottom, to guard from overflow.
-        dtype_info DTypeInfo = GetDTypeInfo(DType);
-        usz LineSweepSize = InspectWidth * DTypeInfo.Size * 2;
-        u8* LineSweep = (u8*)GetMemory(LineSweepSize, 0, MEM_READ|MEM_WRITE);
-        if (!LineSweep)
-        {
-            return Poly;
-        }
-        
-        sweep_line Line = { InspectWidth, LineSweep, &LineSweep[InspectWidth * DTypeInfo.Size] };
-        SetNoDataLine(LineSweep, Line.Width * 2, NoData, DType);
+        sweep_line Line = { InspectWidth, FirstLine, SecondLine, TestBlock, NoData };
+        SetNoDataLine(FirstLine, InspectWidth, NoData, DType);
         for (int Row = 0; Row < Height; Row++)
         {
-            GDALDatasetRasterIO(DS, GF_Read, 0, Row, Width, 1, Line.Second+1, Width, 1, DType, 1, 0, 0, Line.Width * DTypeInfo.Size, 0);
-            ProcessSweepLine(Line, DTypeInfo.Func, NoData, Row, &EdgeList, ColHashTable);
-            CopyData(Line.First, Line.Width, Line.Second, Line.Width); // Copy SecondLine into FirstLine.
+            GDALDatasetRasterIO(DS, GF_Read, 0, Row, Width, 1, SecondLine+1, Width, 1, DType, 1, 0, 0, InspectWidth * DTypeSize, 0);
+            ProcessSweepLine(Line, Row, &EdgeData, ColHashTable);
+            CopyData(FirstLine, InspectWidth, SecondLine, InspectWidth); // Copy SecondLine into FirstLine.
         }
-        SetNoDataLine(Line.Second, Line.Width, NoData, DType);
-        ProcessSweepLine(Line, DTypeInfo.Func, NoData, Height-1, &EdgeList, ColHashTable);
+        SetNoDataLine(SecondLine, InspectWidth, NoData, DType);
+        ProcessSweepLine(Line, Height-1, &EdgeData, ColHashTable);
+        
+        FreeMemory(LineDataMem);
         
         StopTiming(&Trace);
         fprintf(stdout, "Sweep line: %f\n", Trace.Diff);
@@ -375,29 +392,24 @@ RasterToOutline(char* SrcRasterPath)
         
         // Sort EdgeList according to connectedness
         
-        usz NumEdges = EdgeList.WriteCur / sizeof(edge);
-        u32* SortedEdges = (u32*)GetMemory(NumEdges * sizeof(u32), 0, MEM_READ|MEM_WRITE);
-        if (!SortedEdges)
-        {
-            return Poly;
-        }
-        
-        edge* EdgeData = (edge*)EdgeList.Base;
+        usz NumEdges = EdgeData.WriteCur / sizeof(edge);
+        u32* SortedEdges = (u32*)&EdgeData.Base[EdgeData.WriteCur];
+        edge* EdgeList = (edge*)EdgeData.Base;
         for (usz EdgeIdx = 1; EdgeIdx < NumEdges; EdgeIdx++)
         {
             SortedEdges[EdgeIdx] = EdgeIdx;
-            EdgeData[EdgeIdx].SortedIdx = EdgeIdx;
+            EdgeList[EdgeIdx].SortedIdx = EdgeIdx;
         }
         
-        usz PolyAllocSize = (NumEdges-1) * sizeof(v2) + RING_LIST_START_SIZE;
-        Poly.Data = GetMemory(PolyAllocSize, 0, MEM_READ|MEM_WRITE);
+        usz PolyAllocSize = (NumEdges+1) * sizeof(v2);
+        Poly.Data = GetMemory(PolyAllocSize, 0, MEM_WRITE);
         if (!Poly.Data)
         {
             return Poly;
         }
         ring_info* Ring = (ring_info*)Poly.Data;
         
-        WriteVertexPair(Ring, Affine, EdgeData, &SortedEdges[1]);
+        WriteVertexPair(Ring, Affine, EdgeList, &SortedEdges[1]);
         
         edge _LowestEdgeStub = { EdgeType_None, I32_MAX, I32_MAX, 0, 0, 0 };
         edge _HighestEdgeStub = { EdgeType_None, (int)I32_MIN, (int)I32_MIN, 0, 0, 0 };
@@ -413,20 +425,15 @@ RasterToOutline(char* SrcRasterPath)
         {
             u32 NextIdx = 0;
             
-            edge* PrevEdge = &EdgeData[SortedEdges[InsertIdx-1]];
+            edge* PrevEdge = &EdgeList[SortedEdges[InsertIdx-1]];
             line_dir NextDir = GetLineDirection(PrevDir, PrevEdge);
             if (NextDir == LineDir_Down)
             {
-                NextIdx = EdgeData[PrevEdge->Below].SortedIdx;
+                NextIdx = EdgeList[PrevEdge->Below].SortedIdx;
             }
             else
             {
-                NextIdx = EdgeData[PrevEdge->Above].SortedIdx;
-            }
-            
-            if (NextIdx == 0)
-            {
-                return Poly;
+                NextIdx = EdgeList[PrevEdge->Above].SortedIdx;
             }
             
             if (NextIdx == FirstIdx)
@@ -438,11 +445,11 @@ RasterToOutline(char* SrcRasterPath)
                 
                 // New ring.
                 Ring = GetNextRingInfo(Ring);
-                WriteVertexPair(Ring, Affine, EdgeData, &SortedEdges[InsertIdx]);
+                WriteVertexPair(Ring, Affine, EdgeList, &SortedEdges[InsertIdx]);
                 
                 FirstIdx = InsertIdx;
-                edge* FirstEdge = &EdgeData[SortedEdges[FirstIdx]];
-                edge* SecondEdge = &EdgeData[SortedEdges[FirstIdx+1]];
+                edge* FirstEdge = &EdgeList[SortedEdges[FirstIdx]];
+                edge* SecondEdge = &EdgeList[SortedEdges[FirstIdx+1]];
                 PrevDir = (SecondEdge->Col > FirstEdge->Col) ? LineDir_Right : LineDir_Left;
             }
             else
@@ -450,8 +457,8 @@ RasterToOutline(char* SrcRasterPath)
                 u32* Insert = &SortedEdges[InsertIdx];
                 u32* Next = &SortedEdges[NextIdx];
                 
-                edge* InsertEdge = &EdgeData[Insert[0]];
-                edge* NextEdge = &EdgeData[Next[0]];
+                edge* InsertEdge = &EdgeList[Insert[0]];
+                edge* NextEdge = &EdgeList[Next[0]];
                 
                 u32 TmpA = Insert[0];
                 u32 TmpB = Insert[1];
@@ -469,7 +476,7 @@ RasterToOutline(char* SrcRasterPath)
                     NextEdge[0].SortedIdx = InsertIdx;
                     NextEdge[1].SortedIdx = InsertIdx+1;
                     
-                    WriteVertexPair(Ring, Affine, EdgeData, Insert);
+                    WriteVertexPair(Ring, Affine, EdgeList, Insert);
                 }
                 else
                 {
@@ -495,7 +502,7 @@ RasterToOutline(char* SrcRasterPath)
                         InsertEdge[1].SortedIdx = InsertIdx;
                     }
                     
-                    WriteVertexPair(Ring, Affine, EdgeData, Insert);
+                    WriteVertexPair(Ring, Affine, EdgeList, Insert);
                 }
             }
         }
@@ -526,10 +533,7 @@ RasterToOutline(char* SrcRasterPath)
 #endif
         }
         
-        FreeMemory(EdgeList.Base);
-        FreeMemory(ColHashTable);
-        FreeMemory(LineSweep);
-        FreeMemory(SortedEdges);
+        FreeMemory(EdgeData.Base);
         
         StopTiming(&Trace);
         fprintf(stdout, "Post-loop: %f\n", Trace.Diff);
