@@ -33,21 +33,21 @@ enum line_dir
     LineDir_None
 };
 
-struct edge_data
+struct sweep_info
 {
-    buffer Arena;
-    
-    u32 ColHashTableSize;
     u32 LineSweepSize;
-    u32 ListOffset;
-    
     u8* FirstLine;
     u8* SecondLine;
     test_block TestBlock;
     double NoData;
     
-    edge* List;
+    u32* ColHashTable;
+};
+
+struct edge_data
+{
     u32 Count;
+    edge List[0];
 };
 
 struct ring_info

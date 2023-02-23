@@ -198,47 +198,43 @@ SetNoDataLine(u8* Line, int Width, double NoData, GDALDataType DType)
 }
 
 internal bool
-ProcessSweepLine(edge_data* Edges, int Row)
+ProcessSweepLine(sweep_info* Sweep, buffer* EdgeArena, int Row)
 {
-    for (int Col = 0; Col < Edges->LineSweepSize-1; Col++)
+    edge_data* EdgeData = (edge_data*)EdgeArena->Base;
+    for (int Col = 0; Col < Sweep->LineSweepSize-1; Col++)
     {
-        edge_type Type = Edges->TestBlock(Edges->FirstLine + Col, Edges->SecondLine + Col, Edges->NoData);
+        edge_type Type = Sweep->TestBlock(Sweep->FirstLine + Col, Sweep->SecondLine + Col, Sweep->NoData);
         if (Type != EdgeType_None)
         {
-            u32 NewEdgeIdx = Edges->Count++;
-            usz RequiredSize = (Edges->Count * sizeof(edge)) + (Edges->Count * sizeof(u32));
-            usz CurrentSize = Edges->Arena.Size - Edges->ListOffset;
-            
-            if (RequiredSize > CurrentSize)
+            u32 NewEdgeIdx = EdgeData->Count++;
+            usz RequiredSize = sizeof(edge_data) + EdgeData->Count * (sizeof(edge) + sizeof(u32));
+            if (RequiredSize > EdgeArena->Size)
             {
-                usz NewAllocSize = Edges->ListOffset + (RequiredSize * 2);
+                usz NewAllocSize = RequiredSize * 2; // Doubles size so it won't keep reallocing all the time.
                 u8* NewAlloc = (u8*)GetMemory(NewAllocSize, 0, MEM_WRITE);
                 if (!NewAlloc)
                 {
                     return false;
                 }
-                CopyData(NewAlloc, NewAllocSize, Edges->Arena.Base, Edges->Arena.WriteCur);
-                FreeMemory(Edges->Arena.Base);
+                CopyData(NewAlloc, EdgeArena->WriteCur, EdgeArena->Base, EdgeArena->WriteCur);
+                FreeMemory(EdgeArena->Base);
                 
-                Edges->Arena.Base = NewAlloc;
-                Edges->Arena.Size = NewAllocSize;
-                Edges->FirstLine = Edges->Arena.Base + Edges->ColHashTableSize;
-                Edges->SecondLine = Edges->FirstLine + Edges->LineSweepSize;
-                Edges->List = (edge*)(Edges->SecondLine + Edges->LineSweepSize);
+                EdgeArena->Base = (u8*)NewAlloc;
+                EdgeArena->Size = Align(NewAllocSize, gSysInfo.PageSize);
+                EdgeData = (edge_data*)NewAlloc;
             }
             
-            edge* NewEdge = PushStruct(&Edges->Arena, edge);
+            edge* NewEdge = PushStruct(EdgeArena, edge);
             *NewEdge = { Type, Row, Col, 0, 0 };
             
-            u32* ColHashTable = (u32*)Edges->Arena.Base;
-            u32 AboveEdgeIdx = ColHashTable[Col];
+            u32 AboveEdgeIdx = Sweep->ColHashTable[Col];
             if (AboveEdgeIdx > 0)
             {
-                edge* AboveEdge = Edges->List + AboveEdgeIdx;
+                edge* AboveEdge = &EdgeData->List[AboveEdgeIdx];
                 NewEdge->Above = AboveEdgeIdx;
                 AboveEdge->Below = NewEdgeIdx;
             }
-            ColHashTable[Col] = NewEdgeIdx;
+            Sweep->ColHashTable[Col] = NewEdgeIdx;
         }
     }
     
@@ -335,6 +331,10 @@ RasterToOutline(GDALDatasetH DS)
     int Height = GDALGetRasterYSize(DS);
     int Bands = GDALGetRasterCount(DS);
     
+    int InspectWidth = Width + 2; // One extra pixel on the left and right, to guard from overflow.
+    int InspectHeight = Height + 2; // One extra row on top and bottom, to guard from overflow.
+    usz DTypeSize = GetDTypeSize(DType);
+    
     double Affine[6];
     GDALGetGeoTransform(DS, Affine);
     
@@ -343,31 +343,34 @@ RasterToOutline(GDALDatasetH DS)
     
     if (RasterHasNoData)
     {
-        int InspectWidth = Width + 2; // One extra pixel on the left and right, to guard from overflow.
-        int InspectHeight = Height + 2; // One extra row on top and bottom, to guard from overflow.
-        usz DTypeSize = GetDTypeSize(DType);
+        // Prepare memory arenas.
         
-        edge_data Edges = {0};
-        Edges.ColHashTableSize = Width * sizeof(u32);
-        Edges.LineSweepSize = InspectWidth * DTypeSize;
-        Edges.ListOffset = Edges.ColHashTableSize + (Edges.LineSweepSize * 2);
-        
-        usz EdgeDataSize = Edges.ListOffset + EDGE_DATA_START_SIZE;
-        u8* EdgeDataMem = (u8*)GetMemory(EdgeDataSize, 0, MEM_WRITE);
-        if (!EdgeDataMem)
+        usz ColHashTableSize = Width * sizeof(u32);
+        usz LineSweepSize = InspectWidth * DTypeSize;
+        usz SweepSize = Align(sizeof(sweep_info) + (LineSweepSize * 2) + ColHashTableSize, gSysInfo.PageSize);
+        sweep_info* Sweep = (sweep_info*)GetMemory(SweepSize, 0, MEM_WRITE);
+        if (!Sweep)
         {
             return Poly;
         }
         
-        Edges.Arena = Buffer(EdgeDataMem, 0, Align(EdgeDataSize, gSysInfo.PageSize));
-        Edges.TestBlock = GetTestBlockCallback(DType);
-        Edges.NoData = NoData;
+        Sweep->LineSweepSize = LineSweepSize;
+        Sweep->FirstLine = (u8*)&Sweep[1];
+        Sweep->SecondLine = Sweep->FirstLine + LineSweepSize;
+        Sweep->TestBlock = GetTestBlockCallback(DType);
+        Sweep->NoData = NoData;
+        Sweep->ColHashTable = (u32*)(Sweep->SecondLine + LineSweepSize);
         
-        PushSize(&Edges.Arena, Edges.ColHashTableSize, u32);
-        Edges.FirstLine = PushSize(&Edges.Arena, Edges.LineSweepSize, u8);
-        Edges.SecondLine = PushSize(&Edges.Arena, Edges.LineSweepSize, u8);
-        Edges.List = PushStruct(&Edges.Arena, edge); // Inits list with zeroed stub struct [idx 0].
-        Edges.Count++;
+        void* EdgeMem = GetMemory(EDGE_DATA_START_SIZE, 0, MEM_WRITE);
+        if (!EdgeMem)
+        {
+            return Poly;
+        }
+        buffer EdgeArena = Buffer(EdgeMem, 0, Align(EDGE_DATA_START_SIZE, gSysInfo.PageSize));
+        
+        edge_data* Edges = PushStruct(&EdgeArena, edge_data);
+        PushStruct(&EdgeArena, edge); // Inits list with zeroed stub struct [idx 0].
+        Edges->Count++;
         
         StopTiming(&Trace);
         fprintf(stdout, "Init setup: %f\n", Trace.Diff);
@@ -375,15 +378,32 @@ RasterToOutline(GDALDatasetH DS)
         
         // Get edges line by line.
         
-        SetNoDataLine(Edges.FirstLine, InspectWidth, NoData, DType);
+        SetNoDataLine(Sweep->FirstLine, InspectWidth, NoData, DType);
         for (int Row = 0; Row < Height; Row++)
         {
-            GDALDatasetRasterIO(DS, GF_Read, 0, Row, Width, 1, Edges.SecondLine+1, Width, 1, DType, 1, 0, 0, Edges.LineSweepSize, 0);
-            ProcessSweepLine(&Edges, Row);
-            CopyData(Edges.FirstLine, InspectWidth, Edges.SecondLine, InspectWidth);
+            GDALDatasetRasterIO(DS, GF_Read, 0, Row, Width, 1, Sweep->SecondLine+1, Width, 1, DType, 1, 0, 0, LineSweepSize, 0);
+            ProcessSweepLine(Sweep, &EdgeArena, Row);
+            CopyData(Sweep->FirstLine, InspectWidth, Sweep->SecondLine, InspectWidth);
         }
-        SetNoDataLine(Edges.SecondLine, InspectWidth, NoData, DType);
-        ProcessSweepLine(&Edges, Height-1);
+        SetNoDataLine(Sweep->SecondLine, InspectWidth, NoData, DType);
+        ProcessSweepLine(Sweep, &EdgeArena, Height-1);
+        
+        Edges = (edge_data*)EdgeArena.Base; // Re-assigns in case EdgeArena was reallocated.
+        
+        // Assigns output memory buffer (Sweep isn't used anymore, so tries to reuse it to avoid
+        // a new allocation).
+        
+        usz PolyDataSize = Align(RING_DATA_START_SIZE + (Edges->Count * sizeof(v2)), gSysInfo.PageSize);
+        if (PolyDataSize > SweepSize)
+        {
+            FreeMemory(Sweep);
+            Sweep = (sweep_info*)GetMemory(PolyDataSize, 0, MEM_WRITE);
+            if (!Sweep)
+            {
+                return Poly;
+            }
+        }
+        ring_info* Ring = Poly.Rings = (ring_info*)Sweep;
         
         StopTiming(&Trace);
         fprintf(stdout, "Sweep line: %f\n", Trace.Diff);
@@ -391,35 +411,27 @@ RasterToOutline(GDALDatasetH DS)
         
         // Sort EdgeList according to connectedness
         
-        u32* SortedEdges = (u32*)(Edges.List + Edges.Count);
-        for (usz EdgeIdx = 1; EdgeIdx < Edges.Count; EdgeIdx++)
+        u32* SortedEdges = (u32*)(Edges->List + Edges->Count);
+        for (usz EdgeIdx = 1; EdgeIdx < Edges->Count; EdgeIdx++)
         {
             SortedEdges[EdgeIdx] = EdgeIdx;
-            Edges.List[EdgeIdx].SortedIdx = EdgeIdx;
+            Edges->List[EdgeIdx].SortedIdx = EdgeIdx;
         }
-        
-        usz PolyDataSize = Align(RING_DATA_START_SIZE + (Edges.Count * sizeof(v2)), gSysInfo.PageSize);
-        void* PolyData = GetMemory(PolyDataSize, 0, MEM_WRITE);
-        if (!PolyData)
-        {
-            return Poly;
-        }
-        ring_info* Ring = Poly.Rings = (ring_info*)PolyData;
         
         u32 FirstIdx = 1;
-        WriteVertexPair(Ring, Affine, Edges.List, &SortedEdges[FirstIdx]);
+        WriteVertexPair(Ring, Affine, Edges->List, &SortedEdges[FirstIdx]);
         line_dir PrevDir = LineDir_Right; // Always begins to the right.
         
         StopTiming(&Trace);
         fprintf(stdout, "Pre-loop: %f\n", Trace.Diff);
         StartTiming(&Trace);
         
-        for (u32 InsertIdx = 3; InsertIdx < Edges.Count; InsertIdx += 2)
+        for (u32 InsertIdx = 3; InsertIdx < Edges->Count; InsertIdx += 2)
         {
-            edge* PrevEdge = &Edges.List[SortedEdges[InsertIdx-1]];
+            edge* PrevEdge = &Edges->List[SortedEdges[InsertIdx-1]];
             line_dir NextDir = GetLineDirection(PrevDir, PrevEdge);
             
-            u32 NextIdx = (NextDir == LineDir_Down) ? Edges.List[PrevEdge->Below].SortedIdx : Edges.List[PrevEdge->Above].SortedIdx;
+            u32 NextIdx = (NextDir == LineDir_Down) ? Edges->List[PrevEdge->Below].SortedIdx : Edges->List[PrevEdge->Above].SortedIdx;
             
             if (NextIdx == FirstIdx)
             {
@@ -430,7 +442,7 @@ RasterToOutline(GDALDatasetH DS)
                 
                 // New ring.
                 Ring = GetNextRingInfo(Ring);
-                usz RequiredSize = (Edges.Count - InsertIdx + 1) * sizeof(v2) + sizeof(ring_info);
+                usz RequiredSize = (Edges->Count - InsertIdx + 1) * sizeof(v2) + sizeof(ring_info);
                 usz RingOffset = (usz)Ring - (usz)Poly.Rings;
                 usz RemainingSize = PolyDataSize - RingOffset;
                 
@@ -451,11 +463,11 @@ RasterToOutline(GDALDatasetH DS)
                     Ring = (ring_info*)((u8*)Poly.Rings + RingOffset);
                 }
                 
-                WriteVertexPair(Ring, Affine, Edges.List, &SortedEdges[InsertIdx]);
+                WriteVertexPair(Ring, Affine, Edges->List, &SortedEdges[InsertIdx]);
                 
                 FirstIdx = InsertIdx;
-                edge* FirstEdge = &Edges.List[SortedEdges[FirstIdx]];
-                edge* SecondEdge = &Edges.List[SortedEdges[FirstIdx+1]];
+                edge* FirstEdge = &Edges->List[SortedEdges[FirstIdx]];
+                edge* SecondEdge = &Edges->List[SortedEdges[FirstIdx+1]];
                 PrevDir = (SecondEdge->Col > FirstEdge->Col) ? LineDir_Right : LineDir_Left;
             }
             
@@ -464,8 +476,8 @@ RasterToOutline(GDALDatasetH DS)
                 u32* Insert = &SortedEdges[InsertIdx];
                 u32* Next = &SortedEdges[NextIdx];
                 
-                edge* InsertEdge = &Edges.List[Insert[0]];
-                edge* NextEdge = &Edges.List[Next[0]];
+                edge* InsertEdge = &Edges->List[Insert[0]];
+                edge* NextEdge = &Edges->List[Next[0]];
                 
                 u32 TmpA = Insert[0];
                 u32 TmpB = Insert[1];
@@ -483,7 +495,7 @@ RasterToOutline(GDALDatasetH DS)
                     NextEdge[0].SortedIdx = InsertIdx;
                     NextEdge[1].SortedIdx = InsertIdx+1;
                     
-                    WriteVertexPair(Ring, Affine, Edges.List, Insert);
+                    WriteVertexPair(Ring, Affine, Edges->List, Insert);
                 }
                 else
                 {
@@ -509,7 +521,7 @@ RasterToOutline(GDALDatasetH DS)
                         InsertEdge[1].SortedIdx = InsertIdx;
                     }
                     
-                    WriteVertexPair(Ring, Affine, Edges.List, Insert);
+                    WriteVertexPair(Ring, Affine, Edges->List, Insert);
                 }
             }
         }
@@ -540,7 +552,7 @@ RasterToOutline(GDALDatasetH DS)
 #endif
         }
         
-        FreeMemory(Edges.Arena.Base);
+        FreeMemory(EdgeArena.Base);
         
         StopTiming(&Trace);
         fprintf(stdout, "Post-loop: %f\n", Trace.Diff);
