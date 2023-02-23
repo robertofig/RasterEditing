@@ -52,9 +52,10 @@ struct edge_data
 
 struct ring_info
 {
+    ring_info* Next;
+    
     u32 Type; // 0: Outer, 1: Inner
     u32 NumVertices;
-    ring_info* Next;
     v2 Vertices[0];
 };
 
