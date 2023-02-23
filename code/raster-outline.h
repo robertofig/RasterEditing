@@ -29,40 +29,42 @@ enum line_dir
     LineDir_Left,
     LineDir_Right,
     LineDir_Down,
-    LineDir_Up
+    LineDir_Up,
+    LineDir_None
 };
 
-struct sweep_line
+struct edge_data
 {
-    int Width;
-    u8* First;
-    u8* Second;
-    test_block TestBlock;
-    double NoData;
-};
-
-struct edge_arena
-{
-    buffer* Arena;
+    buffer Arena;
     
     u32 ColHashTableSize;
     u32 LineSweepSize;
+    u32 ListOffset;
+    
+    u8* FirstLine;
+    u8* SecondLine;
+    test_block TestBlock;
+    double NoData;
+    
+    edge* List;
+    u32 Count;
 };
 
 struct ring_info
 {
     u32 Type; // 0: Outer, 1: Inner
     u32 NumVertices;
+    ring_info* Next;
     v2 Vertices[0];
 };
 
+#define RING_DATA_START_SIZE (256 * sizeof(ring_info))
+
 struct poly_info
 {
-    void* Data;
-    
     u32 NumVertices;
     u32 NumRings;
-    ring_info** Rings;
+    ring_info* Rings;
 };
 
 #endif //RASTER_OUTLINE_H
