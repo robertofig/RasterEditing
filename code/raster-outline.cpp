@@ -277,41 +277,51 @@ GetNextRingInfo(ring_info* Ring)
 }
 
 internal bool
+CheckCollision(v2 Test, v2 BP0, v2 BP1, v2 BP2, v2 BP3)
+{
+    if (BP1.X == BP2.X) // Vertical line
+    {
+        f64 YMin = Min(BP1.Y, BP2.Y);
+        f64 YMax = Max(BP1.Y, BP2.Y);
+        return (Test.X < BP1.X && Test.Y >= YMin && Test.Y <= YMax);
+    }
+    else if (BP1.Y == Test.Y) // Collinear Horizontal line
+    {
+        f64 XMin = Min(BP1.X, BP2.X);
+        if (Test.X < XMin)  // Hits ray to the right.
+        {
+            return ((BP0.Y < BP1.Y && BP2.Y < BP3.Y) || (BP0.Y > BP1.Y && BP2.Y > BP3.Y));
+        }
+    }
+    return false;
+}
+
+internal bool
 IsRingInsideRing(ring_info* A, ring_info* B)
 {
     if (A != B
         && B->Type == 0) // This is only until the code supports rings inside inner rings.
     {
-        v2* Test = A->Vertices;
-        usz RayRightCount = 0, RayUpCount = 0, RayDownCount = 0;
+        v2 Test = A->Vertices[0];
+        usz RayCount = 0;
         
-        v2* BP0, *BP1, *BPLast = &B->Vertices[B->NumVertices];
-        BP0 = BP1 = B->Vertices;
-        while (++BP1 < BPLast)
+        // BP1-BP2 is the test line, BP0-BP1 is the line before and BP1-BP2 is the line after.
+        v2 BP0 = B->Vertices[B->NumVertices-2];
+        v2 BP1 = B->Vertices[0];
+        v2 BP2 = B->Vertices[1];
+        
+        for (u32 BIdx = 2; BIdx < B->NumVertices; BIdx++)
         {
-            if (BP0->X == BP1->X) // Vertical line
-            {
-                f64 YMin = Min(BP0->Y, BP1->Y);
-                f64 YMax = Max(BP0->Y, BP1->Y);
-                
-                if ((Test->X < BP0->X) && (Test->Y >= YMin) && (Test->Y <= YMax)) RayRightCount++;
-                if ((Test->X == BP0->X) && (Test->Y < YMin)) RayUpCount++;
-                if ((Test->X == BP0->X) && (Test->Y > YMax)) RayDownCount++;
-            }
-            else // Horizontal line
-            {
-                f64 XMin = Min(BP0->X, BP1->X);
-                f64 XMax = Max(BP0->X, BP1->X);
-                
-                if ((Test->X >= XMin) && (Test->X <= XMax) && (Test->Y < BP0->Y)) RayUpCount++;
-                if ((Test->X >= XMin) && (Test->X <= XMax) && (Test->Y > BP0->Y)) RayDownCount++;
-                if ((Test->Y == BP0->Y) && (Test->X < XMin)) RayRightCount++;
-            }
-            
-            BP0++;
+            v2 BP3 = B->Vertices[BIdx];
+            RayCount += CheckCollision(Test, BP0, BP1, BP2, BP3);
+            BP0 = BP1;
+            BP1 = BP2;
+            BP2 = BP3;
         }
+        v2 BP3 = B->Vertices[1];
+        RayCount += CheckCollision(Test, BP0, BP1, BP2, BP3);
         
-        return (RayRightCount % 0) && (RayUpCount % 0) && (RayDownCount % 0);
+        return RayCount % 2;
     }
     
     return false;
@@ -404,6 +414,7 @@ RasterToOutline(GDALDatasetH DS)
             }
         }
         ring_info* Ring = Poly.Rings = (ring_info*)Sweep;
+        *Ring = {0};
         
         StopTiming(&Trace);
         fprintf(stdout, "Sweep line: %f\n", Trace.Diff);
@@ -537,20 +548,41 @@ RasterToOutline(GDALDatasetH DS)
         Poly.NumVertices += Ring->NumVertices;
         
         ring_info* PrevRing = Poly.Rings; // First ring is always outer.
+        ring_info* TargetRing = GetNextRingInfo(PrevRing);
+        usz OuterRingCount = 1;
+        
         for (u32 Count = 1; Count < Poly.NumRings; Count++)
         {
-            ring_info* ThisRing = GetNextRingInfo(PrevRing);
-#if 0
-            ring_info* VerifyRing = Poly.Rings[0];
+#if 1
+            bool IsInnerRing = false;
+            ring_info* TestRing = &Poly.Rings[0];
             for (u32 Count2 = 0; Count2 < Poly.NumRings; Count2++)
             {
-                VerifyRing = GetNextRingInfo(VerifyRing);
+                if (TestRing != TargetRing
+                    && IsRingInsideRing(TargetRing, TestRing))
+                {
+                    IsInnerRing = true;
+                    break;
+                }
+                TestRing = GetNextRingInfo(TestRing);
             }
+            
+            if (!IsInnerRing)
+            {
+                PrevRing = PrevRing->Next = TargetRing;
+                OuterRingCount++;
+            }
+            
+            TargetRing = GetNextRingInfo(TargetRing);
 #else
             PrevRing->Next = ThisRing;
             PrevRing = ThisRing;
 #endif
         }
+        
+#if 1
+        Poly.NumRings = OuterRingCount;
+#endif
         
         FreeMemory(EdgeArena.Base);
         
