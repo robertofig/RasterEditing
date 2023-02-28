@@ -33,7 +33,7 @@ enum line_dir
     LineDir_None
 };
 
-struct sweep_info
+struct arena_info
 {
     u32 LineSweepSize;
     u8* FirstLine;
@@ -41,13 +41,13 @@ struct sweep_info
     test_block TestBlock;
     double NoData;
     
+    u32 ColHashTableSize;
     u32* ColHashTable;
-};
-
-struct edge_data
-{
-    u32 Count;
-    edge List[0];
+    
+    u32 EdgeDataSize;
+    u32 EdgeCount;
+    edge* EdgeList;
+    u32* SortedEdges;
 };
 
 struct ring_info
@@ -60,6 +60,16 @@ struct ring_info
 };
 
 #define RING_DATA_START_SIZE (256 * sizeof(ring_info))
+
+struct tree_node
+{
+    f64 BBoxArea;
+    ring_info* Ring;
+    
+    tree_node* Parent;
+    tree_node* Sibling;
+    tree_node* Child;
+};
 
 struct poly_info
 {
