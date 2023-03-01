@@ -1,8 +1,71 @@
-#include "gdal.h"
-#include "geotypes-base.h"
 #include "tinybase-platform.h"
 
-#include "raster-outline.h"
+//================================
+// Structs and defines
+//================================
+
+#define EDGE_DATA_START_SIZE Kilobyte(64)
+#define RING_DATA_START_SIZE Kilobyte(64)
+
+enum edge_type
+{
+    EdgeType_TopLeft = 0,
+    EdgeType_TopRight = 1,
+    EdgeType_BottomLeft = 2,
+    EdgeType_BottomRight = 3,
+    EdgeType_None = 4
+};
+
+struct edge
+{
+    edge_type Type;
+    int Row;
+    int Col;
+    u32 Above;
+    u32 Below;
+    u32 SortedIdx;
+};
+
+enum line_dir
+{
+    LineDir_Left,
+    LineDir_Right,
+    LineDir_Down,
+    LineDir_Up,
+    LineDir_None
+};
+
+typedef edge_type (*test_block)(u8*, u8*, double);
+struct arena_info
+{
+    u32 LineSweepSize;
+    u8* FirstLine;
+    u8* SecondLine;
+    test_block TestBlock;
+    double NoData;
+    
+    u32 ColHashTableSize;
+    u32* ColHashTable;
+    
+    u32 EdgeDataSize;
+    u32 EdgeCount;
+    edge* EdgeList;
+    u32* SortedEdges;
+};
+
+struct tree_node
+{
+    f64 BBoxArea;
+    ring_info* Ring;
+    
+    tree_node* Parent;
+    tree_node* Sibling;
+    tree_node* Child;
+};
+
+//================================
+// Functions
+//================================
 
 internal edge_type
 _TestBlockU8(u8* _TopRow, u8* _BottomRow, double _NoData)
@@ -213,6 +276,7 @@ ProcessSweepLine(buffer* Arena, arena_info** InfoPtr, int Row)
                 u8* NewAlloc = (u8*)GetMemory(NewAllocSize, 0, MEM_WRITE);
                 if (!NewAlloc)
                 {
+                    FreeMemory(Arena->Base);
                     return false;
                 }
                 CopyData(NewAlloc, Arena->WriteCur, Arena->Base, Arena->WriteCur);
@@ -309,8 +373,7 @@ CheckCollision(v2 Test, v2 BP0, v2 BP1, v2 BP2, v2 BP3)
 internal bool
 IsRingInsideRing(ring_info* A, ring_info* B)
 {
-    if (A != B
-        && B->Type == 0) // This is only until the code supports rings inside inner rings.
+    if (A != B)
     {
         v2 Test = A->Vertices[0];
         usz RayCount = 0;
@@ -340,7 +403,7 @@ IsRingInsideRing(ring_info* A, ring_info* B)
 internal poly_info
 RasterToOutline(GDALDatasetH DS)
 {
-    poly_info Poly = {0}, _Poly = {0};
+    poly_info Poly = {0}, EmptyPoly = {0};
     
     timing Trace;
     StartTiming(&Trace);
@@ -373,7 +436,7 @@ RasterToOutline(GDALDatasetH DS)
         void* ArenaMem = GetMemory(ArenaSize, 0, MEM_WRITE);
         if (!ArenaMem)
         {
-            return Poly;
+            return EmptyPoly;
         }
         buffer Arena = Buffer(ArenaMem, 0, ArenaSize);
         arena_info* Info = PushStruct(&Arena, arena_info);
@@ -399,11 +462,11 @@ RasterToOutline(GDALDatasetH DS)
         for (int Row = 0; Row < Height; Row++)
         {
             GDALDatasetRasterIO(DS, GF_Read, 0, Row, Width, 1, Info->SecondLine+1, Width, 1, DType, 1, 0, 0, LineSweepSize, 0);
-            if (!ProcessSweepLine(&Arena, &Info, Row)) goto cleanup;
+            if (!ProcessSweepLine(&Arena, &Info, Row)) return EmptyPoly;
             CopyData(Info->FirstLine, InspectWidth, Info->SecondLine, InspectWidth);
         }
         SetNoDataLine(Info->SecondLine, InspectWidth, NoData, DType);
-        if (!ProcessSweepLine(&Arena, &Info, Height-1)) goto cleanup;
+        if (!ProcessSweepLine(&Arena, &Info, Height-1))  return EmptyPoly;
         
         StopTiming(&Trace);
         fprintf(stdout, "Sweep line: %f\n", Trace.Diff);
@@ -419,11 +482,12 @@ RasterToOutline(GDALDatasetH DS)
         }
         
         usz PolyDataSize = Align(RING_DATA_START_SIZE + (Info->EdgeCount * sizeof(v2)), gSysInfo.PageSize);
-        if ((_Poly.Rings = (ring_info*)GetMemory(PolyDataSize, 0, MEM_WRITE)) == NULL)
+        if ((Poly.Rings = (ring_info*)GetMemory(PolyDataSize, 0, MEM_WRITE)) == NULL)
         {
-            goto cleanup;
+            FreeMemory(Arena.Base);
+            return EmptyPoly;
         }
-        ring_info* Ring = _Poly.Rings;
+        ring_info* Ring = Poly.Rings;
         
         Arena.WriteCur = sizeof(arena_info); // Set this to reuse first part of the arena for tree_node array.
         tree_node* FirstNode = (tree_node*)(Arena.Base + Arena.WriteCur);
@@ -448,8 +512,8 @@ RasterToOutline(GDALDatasetH DS)
             {
                 // Repeat first vertex of ring to close it.
                 Ring->Vertices[Ring->NumVertices++] = Ring->Vertices[0];
-                _Poly.NumRings++;
-                _Poly.NumVertices += Ring->NumVertices;
+                Poly.NumRings++;
+                Poly.NumVertices += Ring->NumVertices;
                 
                 tree_node* Node = PushStruct(&Arena, tree_node);
                 *Node = {0};
@@ -460,7 +524,7 @@ RasterToOutline(GDALDatasetH DS)
                 // New ring.
                 Ring = GetNextRingInfo(Ring);
                 usz RequiredSize = (Info->EdgeCount - InsertIdx + 1) * sizeof(v2) + sizeof(ring_info);
-                usz RingOffset = (usz)Ring - (usz)_Poly.Rings;
+                usz RingOffset = (usz)Ring - (usz)Poly.Rings;
                 usz RemainingSize = PolyDataSize - RingOffset;
                 
                 if (RequiredSize > RemainingSize)
@@ -471,14 +535,15 @@ RasterToOutline(GDALDatasetH DS)
                     void* NewPolyData = GetMemory(NewPolyDataSize, 0, MEM_WRITE);
                     if (!NewPolyData)
                     {
-                        FreeMemory(_Poly.Rings);
-                        goto cleanup;
+                        FreeMemory(Arena.Base);
+                        FreeMemory(Poly.Rings);
+                        return EmptyPoly;
                     }
-                    CopyData(NewPolyData, NewPolyDataSize, _Poly.Rings, PolyDataSize);
-                    FreeMemory(_Poly.Rings);
-                    _Poly.Rings = (ring_info*)NewPolyData;
+                    CopyData(NewPolyData, NewPolyDataSize, Poly.Rings, PolyDataSize);
+                    FreeMemory(Poly.Rings);
+                    Poly.Rings = (ring_info*)NewPolyData;
                     PolyDataSize = NewPolyDataSize;
-                    Ring = (ring_info*)((u8*)_Poly.Rings + RingOffset);
+                    Ring = (ring_info*)((u8*)Poly.Rings + RingOffset);
                 }
                 
                 WriteVertexPair(Ring, Affine, Info->EdgeList, &Info->SortedEdges[InsertIdx], &BBox);
@@ -545,8 +610,8 @@ RasterToOutline(GDALDatasetH DS)
         }
         
         Ring->Vertices[Ring->NumVertices++] = Ring->Vertices[0];
-        _Poly.NumRings++;
-        _Poly.NumVertices += Ring->NumVertices;
+        Poly.NumRings++;
+        Poly.NumVertices += Ring->NumVertices;
         
         tree_node* Node = PushStruct(&Arena, tree_node);
         *Node = {0};
@@ -560,12 +625,12 @@ RasterToOutline(GDALDatasetH DS)
         // Order polygons by outer/inner.
         
         tree_node NullNode = { DBL_MAX, 0, 0, 0, 0 };
-        for (u32 TargetIdx = 1; TargetIdx < _Poly.NumRings; TargetIdx++)
+        for (u32 TargetIdx = 1; TargetIdx < Poly.NumRings; TargetIdx++)
         {
             tree_node* TargetNode = &FirstNode[TargetIdx];
             
             tree_node* OuterNode = &NullNode;
-            for (u32 TestIdx = 0; TestIdx < _Poly.NumRings; TestIdx++)
+            for (u32 TestIdx = 0; TestIdx < Poly.NumRings; TestIdx++)
             {
                 tree_node* TestNode = &FirstNode[TestIdx];
                 if (TestNode != TargetNode
@@ -602,7 +667,7 @@ RasterToOutline(GDALDatasetH DS)
         
         ring_info NullRing = {0};
         ring_info* PrevRing = &NullRing;
-        for (u32 NodeIdx = 0; NodeIdx < _Poly.NumRings; NodeIdx++)
+        for (u32 NodeIdx = 0; NodeIdx < Poly.NumRings; NodeIdx++)
         {
             tree_node* Node = &FirstNode[NodeIdx];
             if (Node->Ring->Type == 0)
@@ -623,11 +688,6 @@ RasterToOutline(GDALDatasetH DS)
         
         StopTiming(&Trace);
         fprintf(stdout, "Tree ordering: %f\n", Trace.Diff);
-        
-        Poly = _Poly;
-        
-        cleanup:
-        if (Arena.Base) FreeMemory(Arena.Base);
     }
     else
     {
