@@ -1,12 +1,12 @@
 @echo off
 
-SET GDALInclude=""
-SET TinyBaseInclude=""
-SET GeoTypesInclude=""
+SET GDALInc=""
+SET TinyBaseInc=""
+SET GeoTypesInc=""
 SET GDALLib=""
 
-SET CompilerIncludes=/I %GDALInclude% /I %TinyBaseInclude% /I %GeoTypesInclude%
-SET CompilerFlags=/EHsc /Zi
+SET CompilerIncludes=/I %GDALInc% /I %TinyBaseInc% /I %GeoTypesInc%
+SET CompilerFlags=/EHsc /Zi /nologo
 SET LinkerFlags=/INCREMENTAL:NO
 
 pushd ..\build

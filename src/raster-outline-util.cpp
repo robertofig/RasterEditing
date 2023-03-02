@@ -1,4 +1,4 @@
-#include "raster-outline.cpp"
+#include "raster-outline.h"
 #include "geotypes-shp.h"
 
 int main(int Argc, char** Argv)
