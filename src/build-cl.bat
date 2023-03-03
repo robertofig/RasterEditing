@@ -1,9 +1,9 @@
 @echo off
 
-SET GDALInc="C:\SIG\GDAL-305\include"
-SET TinyBaseInc="Z:\TinyBase\src"
-SET GeoTypesInc="Z:\GeoTypes\src"
-SET GDALLib="C:\SIG\GDAL-305\lib\gdal_i.lib"
+SET GDALInc=""
+SET TinyBaseInc=""
+SET GeoTypesInc=""
+SET GDALLib=""
 
 SET CompilerIncludes=/I %GDALInc% /I %TinyBaseInc% /I %GeoTypesInc%
 SET CompilerFlags=/EHsc /Zi /nologo

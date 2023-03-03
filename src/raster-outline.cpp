@@ -42,9 +42,10 @@ struct edge_info
     u8* SecondLine;
     u32* ColHashTable;
     
-    u32 LineSweepSize;
+    u32 InspectWidth;
     test_block TestBlock;
     double NoData;
+    u32 DTypeSize;
     
     buffer EdgeArena;
     u32 EdgeCount;
@@ -73,17 +74,8 @@ struct tree_node
 //================================
 
 internal edge_type
-_TestBlockU8(u8* _TopRow, u8* _BottomRow, double _NoData)
+_TestBlockPixels(bool TLNoData, bool TRNoData, bool BLNoData, bool BRNoData)
 {
-    u8* Top = _TopRow;
-    u8* Bottom = _BottomRow;
-    u8 NoData = (u8)_NoData;
-    
-    bool TLNoData = Top[0] == NoData;
-    bool TRNoData = Top[1] == NoData;
-    bool BLNoData = Bottom[0] == NoData;
-    bool BRNoData = Bottom[1] == NoData;
-    
     int NoDataCount = TLNoData + TRNoData + BLNoData + BRNoData;
     if (NoDataCount == 1)
     {
@@ -99,8 +91,22 @@ _TestBlockU8(u8* _TopRow, u8* _BottomRow, double _NoData)
         if (!BLNoData) return EdgeType_BottomLeft;
         if (!BRNoData) return EdgeType_BottomRight;
     }
-    
     return EdgeType_None;
+}
+
+internal edge_type
+_TestBlockU8(u8* _TopRow, u8* _BottomRow, double _NoData)
+{
+    u8* Top = _TopRow;
+    u8* Bottom = _BottomRow;
+    u8 NoData = (u8)_NoData;
+    
+    bool TLNoData = Top[0] == NoData;
+    bool TRNoData = Top[1] == NoData;
+    bool BLNoData = Bottom[0] == NoData;
+    bool BRNoData = Bottom[1] == NoData;
+    
+    return _TestBlockPixels(TLNoData, TRNoData, BLNoData, BRNoData);
 }
 
 internal edge_type
@@ -115,12 +121,7 @@ _TestBlockU16(u8* _TopRow, u8* _BottomRow, double _NoData)
     bool BLNoData = Bottom[0] == NoData;
     bool BRNoData = Bottom[1] == NoData;
     
-    if ( TLNoData && !TRNoData && !BLNoData && !BRNoData) return EdgeType_TopLeft;
-    if (!TLNoData &&  TRNoData && !BLNoData && !BRNoData) return EdgeType_TopRight;
-    if (!TLNoData && !TRNoData &&  BLNoData && !BRNoData) return EdgeType_BottomLeft;
-    if (!TLNoData && !TRNoData && !BLNoData &&  BRNoData) return EdgeType_BottomRight;
-    
-    return EdgeType_None;
+    return _TestBlockPixels(TLNoData, TRNoData, BLNoData, BRNoData);
 }
 
 internal edge_type
@@ -135,12 +136,7 @@ _TestBlockU32(u8* _TopRow, u8* _BottomRow, double _NoData)
     bool BLNoData = Bottom[0] == NoData;
     bool BRNoData = Bottom[1] == NoData;
     
-    if ( TLNoData && !TRNoData && !BLNoData && !BRNoData) return EdgeType_TopLeft;
-    if (!TLNoData &&  TRNoData && !BLNoData && !BRNoData) return EdgeType_TopRight;
-    if (!TLNoData && !TRNoData &&  BLNoData && !BRNoData) return EdgeType_BottomLeft;
-    if (!TLNoData && !TRNoData && !BLNoData &&  BRNoData) return EdgeType_BottomRight;
-    
-    return EdgeType_None;
+    return _TestBlockPixels(TLNoData, TRNoData, BLNoData, BRNoData);
 }
 
 internal edge_type
@@ -155,12 +151,7 @@ _TestBlockF32(u8* _TopRow, u8* _BottomRow, double _NoData)
     bool BLNoData = Bottom[0] == NoData;
     bool BRNoData = Bottom[1] == NoData;
     
-    if ( TLNoData && !TRNoData && !BLNoData && !BRNoData) return EdgeType_TopLeft;
-    if (!TLNoData &&  TRNoData && !BLNoData && !BRNoData) return EdgeType_TopRight;
-    if (!TLNoData && !TRNoData &&  BLNoData && !BRNoData) return EdgeType_BottomLeft;
-    if (!TLNoData && !TRNoData && !BLNoData &&  BRNoData) return EdgeType_BottomRight;
-    
-    return EdgeType_None;
+    return _TestBlockPixels(TLNoData, TRNoData, BLNoData, BRNoData);
 }
 
 internal edge_type
@@ -175,12 +166,7 @@ _TestBlockF64(u8* _TopRow, u8* _BottomRow, double _NoData)
     bool BLNoData = Bottom[0] == NoData;
     bool BRNoData = Bottom[1] == NoData;
     
-    if ( TLNoData && !TRNoData && !BLNoData && !BRNoData) return EdgeType_TopLeft;
-    if (!TLNoData &&  TRNoData && !BLNoData && !BRNoData) return EdgeType_TopRight;
-    if (!TLNoData && !TRNoData &&  BLNoData && !BRNoData) return EdgeType_BottomLeft;
-    if (!TLNoData && !TRNoData && !BLNoData &&  BRNoData) return EdgeType_BottomRight;
-    
-    return EdgeType_None;
+    return _TestBlockPixels(TLNoData, TRNoData, BLNoData, BRNoData);
 }
 
 internal usz
@@ -268,17 +254,20 @@ SetNoDataLine(u8* Line, int Width, double NoData, GDALDataType DType)
 internal bool
 ProcessSweepLine(edge_info* Info, int Row)
 {
-    u32 NewEdgeSize = sizeof(edge) + sizeof(u32); // u32 is for sorted index.
     buffer* Arena = &Info->EdgeArena;
-    
-    for (int Col = 0; Col < Info->LineSweepSize-1; Col++)
+    u8* FirstLine = Info->FirstLine;
+    u8* SecondLine = Info->SecondLine;
+    for (int Col = 0; Col < Info->InspectWidth-1; Col++)
     {
-        edge_type Type = Info->TestBlock(Info->FirstLine + Col, Info->SecondLine + Col, Info->NoData);
+        edge_type Type = Info->TestBlock(FirstLine, SecondLine, Info->NoData);
         if (Type != EdgeType_None)
         {
-            if ((Arena->Size - Arena->WriteCur) < NewEdgeSize)
+            u32 NewEdgeIdx = Info->EdgeCount++;
+            u32 RequiredSize = Info->EdgeCount * (sizeof(edge) + sizeof(u32)); // u32 is for sorted index.
+            
+            if (Arena->Size < RequiredSize)
             {
-                usz NewAllocSize = Arena->Size * 2;
+                usz NewAllocSize = Max(Arena->Size * 2, RequiredSize);
                 u8* NewAlloc = (u8*)GetMemory(NewAllocSize, 0, MEM_WRITE);
                 if (!NewAlloc)
                 {
@@ -292,7 +281,6 @@ ProcessSweepLine(edge_info* Info, int Row)
                 Info->EdgeList = (edge*)NewAlloc;
             }
             
-            u32 NewEdgeIdx = Info->EdgeCount++;
             edge* NewEdge = PushStruct(Arena, edge);
             *NewEdge = { Type, Row, Col, 0, 0 };
             
@@ -305,6 +293,8 @@ ProcessSweepLine(edge_info* Info, int Row)
             }
             Info->ColHashTable[Col] = NewEdgeIdx;
         }
+        FirstLine += Info->DTypeSize;
+        SecondLine += Info->DTypeSize;
     }
     
     return true;
@@ -449,9 +439,10 @@ RasterToOutline(GDALDatasetH DS)
         Info.FirstLine = (u8*)LineSweepMem;
         Info.SecondLine = Info.FirstLine + LineSweepSize;
         Info.ColHashTable = (u32*)(Info.SecondLine + LineSweepSize);
-        Info.LineSweepSize = LineSweepSize;
+        Info.InspectWidth = InspectWidth;
         Info.TestBlock = GetTestBlockCallback(DType);
         Info.NoData = NoData;
+        Info.DTypeSize = DTypeSize;
         Info.EdgeArena = Buffer(EdgeArenaMem, 0, Align(EDGE_DATA_START_SIZE, gSysInfo.PageSize));
         Info.EdgeList = PushStruct(&Info.EdgeArena, edge); // Inits list with zeroed stub struct [idx 0].
         Info.EdgeCount++;
@@ -462,15 +453,17 @@ RasterToOutline(GDALDatasetH DS)
         
         // Get edges line by line.
         
+        u8* LineReadPtr = Info.SecondLine + DTypeSize;
         SetNoDataLine(Info.FirstLine, InspectWidth, NoData, DType);
+        CopyData(Info.SecondLine, LineSweepSize, Info.FirstLine, LineSweepSize);
         for (int Row = 0; Row < Height; Row++)
         {
-            GDALDatasetRasterIO(DS, GF_Read, 0, Row, Width, 1, Info.SecondLine+1, Width, 1, DType, 1, 0, 0, LineSweepSize, 0);
+            GDALDatasetRasterIO(DS, GF_Read, 0, Row, Width, 1, LineReadPtr, Width, 1, DType, 1, 0, 0, 0, 0);
             if (!ProcessSweepLine(&Info, Row)) return EmptyPoly;
-            CopyData(Info.FirstLine, InspectWidth, Info.SecondLine, InspectWidth);
+            CopyData(Info.FirstLine, LineSweepSize, Info.SecondLine, LineSweepSize);
         }
         SetNoDataLine(Info.SecondLine, InspectWidth, NoData, DType);
-        if (!ProcessSweepLine(&Info, Height-1)) return EmptyPoly;
+        if (!ProcessSweepLine(&Info, Height)) return EmptyPoly;
         
         StopTiming(&Trace);
         fprintf(stdout, "Sweep line: %f\n", Trace.Diff);
