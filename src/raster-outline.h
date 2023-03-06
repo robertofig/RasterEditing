@@ -4,6 +4,8 @@
 #include "gdal.h"
 #include "geotypes-base.h"
 
+#define BBOX_BUFFER_SIZE (sizeof(ring_info) + sizeof(v2) * 5)
+
 struct ring_info
 {
     ring_info* Next;
@@ -20,8 +22,8 @@ struct poly_info
     ring_info* Rings;
 };
 
-external poly_info RasterDSToOutline(GDALDatasetH DS);
-external poly_info RasterPathToOutline(char* SrcRasterPath);
+external poly_info RasterToOutline(GDALDatasetH DS, double Value, int BandCount, int* BandIdx);
+external poly_info BBoxOutline(GDALDatasetH DS, u8* BBoxBuffer);
 external void FreePolyInfo(poly_info Poly);
 
 

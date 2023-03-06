@@ -109,7 +109,9 @@ RasterCut(char* DstRaster, char** SrcRasterList, int NumSrcRasters, v2* CutPolyg
     GDALDriverH Driver = GDALGetDriverByName("GTiff");
     char** CreateOptions = NULL;
     CreateOptions = CSLSetNameValue(CreateOptions, "COMPRESS", "LZW");
-    GDALDatasetH DstDS = GDALCreate(Driver, DstRaster, DstXSize, DstYSize, NumBands, GDALGetRasterDataType(SrcDS), CreateOptions);
+    GDALRasterBandH Band = GDALGetRasterBand(SrcDS, 1);
+    GDALDataType DType = GDALGetRasterDataType(Band);
+    GDALDatasetH DstDS = GDALCreate(Driver, DstRaster, DstXSize, DstYSize, NumBands, DType, CreateOptions);
     CSLDestroy(CreateOptions);
     
     GDALSetProjection(DstDS, Proj);

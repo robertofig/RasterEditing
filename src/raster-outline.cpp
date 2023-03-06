@@ -35,7 +35,7 @@ enum line_dir
     LineDir_None
 };
 
-typedef edge_type (*test_block)(u8*, u8*, double);
+typedef edge_type (*test_block)(u8*, u8*, u32, u32, double);
 struct edge_info
 {
     u8* FirstLine;
@@ -43,8 +43,9 @@ struct edge_info
     u32* ColHashTable;
     
     u32 InspectWidth;
+    u32 BandCount;
     test_block TestBlock;
-    double NoData;
+    double Value;
     u32 DTypeSize;
     
     buffer EdgeArena;
@@ -62,7 +63,7 @@ struct edge_info
 struct tree_node
 {
     f64 BBoxArea;
-    ring_info* Ring;
+    u32 RingOffset;
     
     tree_node* Parent;
     tree_node* Sibling;
@@ -95,78 +96,113 @@ _TestBlockPixels(bool TLNoData, bool TRNoData, bool BLNoData, bool BRNoData)
 }
 
 internal edge_type
-_TestBlockU8(u8* _TopRow, u8* _BottomRow, double _NoData)
+_TestBlockU8(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _Value)
 {
     u8* Top = _TopRow;
     u8* Bottom = _BottomRow;
-    u8 NoData = (u8)_NoData;
+    u8 Value = (u8)_Value;
     
-    bool TLNoData = Top[0] == NoData;
-    bool TRNoData = Top[1] == NoData;
-    bool BLNoData = Bottom[0] == NoData;
-    bool BRNoData = Bottom[1] == NoData;
+    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
+    for (usz Count = 0; Count < BandCount; Count++)
+    {
+        TLValue &= Top[0] == Value;
+        TRValue &= Top[1] == Value;
+        BLValue &= Bottom[0] == Value;
+        BRValue &= Bottom[1] == Value;
+        
+        Top += InspectWidth;
+        Bottom += InspectWidth;
+    }
     
-    return _TestBlockPixels(TLNoData, TRNoData, BLNoData, BRNoData);
+    return _TestBlockPixels(TLValue, TRValue, BLValue, BRValue);
 }
 
 internal edge_type
-_TestBlockU16(u8* _TopRow, u8* _BottomRow, double _NoData)
+_TestBlockU16(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _Value)
 {
     u16* Top = (u16*)_TopRow;
     u16* Bottom = (u16*)_BottomRow;
-    u16 NoData = (u16)_NoData;
+    u16 Value = (u16)_Value;
     
-    bool TLNoData = Top[0] == NoData;
-    bool TRNoData = Top[1] == NoData;
-    bool BLNoData = Bottom[0] == NoData;
-    bool BRNoData = Bottom[1] == NoData;
+    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
+    for (usz Count = 0; Count < BandCount; Count++)
+    {
+        TLValue &= Top[0] == Value;
+        TRValue &= Top[1] == Value;
+        BLValue &= Bottom[0] == Value;
+        BRValue &= Bottom[1] == Value;
+        
+        Top += InspectWidth;
+        Bottom += InspectWidth;
+    }
     
-    return _TestBlockPixels(TLNoData, TRNoData, BLNoData, BRNoData);
+    return _TestBlockPixels(TLValue, TRValue, BLValue, BRValue);
 }
 
 internal edge_type
-_TestBlockU32(u8* _TopRow, u8* _BottomRow, double _NoData)
+_TestBlockU32(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _Value)
 {
     u32* Top = (u32*)_TopRow;
     u32* Bottom = (u32*)_BottomRow;
-    u32 NoData = (u32)_NoData;
+    u32 Value = (u32)_Value;
     
-    bool TLNoData = Top[0] == NoData;
-    bool TRNoData = Top[1] == NoData;
-    bool BLNoData = Bottom[0] == NoData;
-    bool BRNoData = Bottom[1] == NoData;
+    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
+    for (usz Count = 0; Count < BandCount; Count++)
+    {
+        TLValue &= Top[0] == Value;
+        TRValue &= Top[1] == Value;
+        BLValue &= Bottom[0] == Value;
+        BRValue &= Bottom[1] == Value;
+        
+        Top += InspectWidth;
+        Bottom += InspectWidth;
+    }
     
-    return _TestBlockPixels(TLNoData, TRNoData, BLNoData, BRNoData);
+    return _TestBlockPixels(TLValue, TRValue, BLValue, BRValue);
 }
 
 internal edge_type
-_TestBlockF32(u8* _TopRow, u8* _BottomRow, double _NoData)
+_TestBlockF32(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _Value)
 {
     f32* Top = (f32*)_TopRow;
     f32* Bottom = (f32*)_BottomRow;
-    f32 NoData = (f32)_NoData;
+    f32 Value = (f32)_Value;
     
-    bool TLNoData = Top[0] == NoData;
-    bool TRNoData = Top[1] == NoData;
-    bool BLNoData = Bottom[0] == NoData;
-    bool BRNoData = Bottom[1] == NoData;
+    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
+    for (usz Count = 0; Count < BandCount; Count++)
+    {
+        TLValue &= Top[0] == Value;
+        TRValue &= Top[1] == Value;
+        BLValue &= Bottom[0] == Value;
+        BRValue &= Bottom[1] == Value;
+        
+        Top += InspectWidth;
+        Bottom += InspectWidth;
+    }
     
-    return _TestBlockPixels(TLNoData, TRNoData, BLNoData, BRNoData);
+    return _TestBlockPixels(TLValue, TRValue, BLValue, BRValue);
 }
 
 internal edge_type
-_TestBlockF64(u8* _TopRow, u8* _BottomRow, double _NoData)
+_TestBlockF64(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _Value)
 {
     f64* Top = (f64*)_TopRow;
     f64* Bottom = (f64*)_BottomRow;
-    f64 NoData = (f64)_NoData;
+    f64 Value = (f64)_Value;
     
-    bool TLNoData = Top[0] == NoData;
-    bool TRNoData = Top[1] == NoData;
-    bool BLNoData = Bottom[0] == NoData;
-    bool BRNoData = Bottom[1] == NoData;
+    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
+    for (usz Count = 0; Count < BandCount; Count++)
+    {
+        TLValue &= Top[0] == Value;
+        TRValue &= Top[1] == Value;
+        BLValue &= Bottom[0] == Value;
+        BRValue &= Bottom[1] == Value;
+        
+        Top += InspectWidth;
+        Bottom += InspectWidth;
+    }
     
-    return _TestBlockPixels(TLNoData, TRNoData, BLNoData, BRNoData);
+    return _TestBlockPixels(TLValue, TRValue, BLValue, BRValue);
 }
 
 internal usz
@@ -259,7 +295,7 @@ ProcessSweepLine(edge_info* Info, int Row)
     u8* SecondLine = Info->SecondLine;
     for (int Col = 0; Col < Info->InspectWidth-1; Col++)
     {
-        edge_type Type = Info->TestBlock(FirstLine, SecondLine, Info->NoData);
+        edge_type Type = Info->TestBlock(FirstLine, SecondLine, Info->InspectWidth, Info->BandCount, Info->Value);
         if (Type != EdgeType_None)
         {
             u32 NewEdgeIdx = Info->EdgeCount++;
@@ -334,9 +370,9 @@ WriteVertexPair(ring_info* Ring, double* Affine, edge* EdgeList, u32* EdgeIdx, b
 }
 
 internal ring_info*
-GetNextRingInfo(ring_info* Ring)
+GetRingFrom(tree_node* Node)
 {
-    ring_info* Result = (ring_info*)(((v2*)&Ring[1]) + Ring->NumVertices);
+    ring_info* Result = (ring_info*)((u8*)Node - Node->RingOffset);
     return Result;
 }
 
@@ -398,13 +434,10 @@ IsRingInsideRing(ring_info* A, ring_info* B)
     return false;
 }
 
-internal poly_info
-RasterToOutline(GDALDatasetH DS)
+external poly_info
+RasterToOutline(GDALDatasetH DS, double Value, int BandCount, int* BandIdx)
 {
     poly_info Poly = {0}, EmptyPoly = {0};
-    
-    timing Trace;
-    StartTiming(&Trace);
     
     GDALRasterBandH Band = GDALGetRasterBand(DS, 1);
     GDALDataType DType = GDALGetRasterDataType(Band);
@@ -420,309 +453,280 @@ RasterToOutline(GDALDatasetH DS)
     GDALGetGeoTransform(DS, Affine);
     
     int RasterHasNoData = 0;
-    double NoData = GDALGetRasterNoDataValue(Band, &RasterHasNoData); // Check if DType isn't i64 or u64.
-    
-    if (RasterHasNoData)
+    double NoData = GDALGetRasterNoDataValue(Band, &RasterHasNoData); // TODO: Check if DType isn't i64 or u64.
+    if (!RasterHasNoData)
     {
-        // Prepare memory arena.
+        NoData = (Value == 0) ? 1 : 0;
+    }
+    
+    // Prepare memory arena.
+    
+    u32 ColHashTableSize = Width * sizeof(u32);
+    u32 LineSweepSize = InspectWidth * DTypeSize;
+    void* LineSweepMem = GetMemory(LineSweepSize*2*BandCount + ColHashTableSize, 0, MEM_WRITE);
+    void* EdgeArenaMem = GetMemory(EDGE_DATA_START_SIZE, 0, MEM_WRITE);
+    if (!LineSweepMem || !EdgeArenaMem)
+    {
+        return EmptyPoly;
+    }
+    u32 AllBandsLineSize = LineSweepSize * BandCount;
+    
+    edge_info Info = {0};
+    Info.FirstLine = (u8*)LineSweepMem;
+    Info.SecondLine = Info.FirstLine + AllBandsLineSize;
+    Info.ColHashTable = (u32*)(Info.SecondLine + AllBandsLineSize);
+    Info.InspectWidth = InspectWidth;
+    Info.BandCount = BandCount;
+    Info.TestBlock = GetTestBlockCallback(DType);
+    Info.Value = Value;
+    Info.DTypeSize = DTypeSize;
+    Info.EdgeArena = Buffer(EdgeArenaMem, 0, Align(EDGE_DATA_START_SIZE, gSysInfo.PageSize));
+    Info.EdgeList = PushStruct(&Info.EdgeArena, edge); // Inits list with zeroed stub struct [idx 0].
+    Info.EdgeCount++;
+    
+    // Get edges line by line.
+    
+    u8* LineReadPtr = Info.SecondLine + DTypeSize;
+    SetNoDataLine(Info.FirstLine, InspectWidth * BandCount, NoData, DType);
+    CopyData(Info.SecondLine, AllBandsLineSize, Info.FirstLine, AllBandsLineSize);
+    for (int Row = 0; Row < Height; Row++)
+    {
+        GDALDatasetRasterIO(DS, GF_Read, 0, Row, Width, 1, LineReadPtr, Width, 1, DType, BandCount, BandIdx, 0, LineSweepSize, 0);
+        if (!ProcessSweepLine(&Info, Row)) return EmptyPoly;
+        CopyData(Info.FirstLine, AllBandsLineSize, Info.SecondLine, AllBandsLineSize);
+    }
+    SetNoDataLine(Info.SecondLine, InspectWidth * BandCount, NoData, DType);
+    if (!ProcessSweepLine(&Info, Height)) return EmptyPoly;
+    
+    if (Info.EdgeCount == 1) // No occurances found.
+    {
+        return EmptyPoly;
+    }
+    
+    // Sort EdgeList according to connectedness
+    
+    Info.SortedEdges = PushSize(&Info.EdgeArena, sizeof(u32) * Info.EdgeCount, u32);
+    for (usz EdgeIdx = 1; EdgeIdx < Info.EdgeCount; EdgeIdx++)
+    {
+        Info.SortedEdges[EdgeIdx] = EdgeIdx;
+        Info.EdgeList[EdgeIdx].SortedIdx = EdgeIdx;
+    }
+    
+    usz PolyDataSize = Align(RING_DATA_START_SIZE + (Info.EdgeCount * sizeof(v2)), gSysInfo.PageSize);
+    if ((Poly.Rings = (ring_info*)GetMemory(PolyDataSize, 0, MEM_WRITE)) == NULL)
+    {
+        return EmptyPoly;
+    }
+    ring_info* Ring = Poly.Rings;
+    
+    u32 FirstIdx = 1;
+    bbox2 BBox = BBox2(DBL_MAX, DBL_MAX, -DBL_MAX, -DBL_MAX);
+    line_dir PrevDir = LineDir_Right; // Always begins to the right.
+    WriteVertexPair(Ring, Affine, Info.EdgeList, &Info.SortedEdges[FirstIdx], &BBox);
+    
+    for (u32 InsertIdx = 3; InsertIdx < Info.EdgeCount; InsertIdx += 2)
+    {
+        edge* PrevEdge = &Info.EdgeList[Info.SortedEdges[InsertIdx-1]];
+        line_dir NextDir = GetLineDirection(PrevDir, PrevEdge);
         
-        u32 ColHashTableSize = Width * sizeof(u32);
-        u32 LineSweepSize = InspectWidth * DTypeSize;
-        void* LineSweepMem = GetMemory(LineSweepSize*2 + ColHashTableSize, 0, MEM_WRITE);
-        void* EdgeArenaMem = GetMemory(EDGE_DATA_START_SIZE, 0, MEM_WRITE);
-        if (!LineSweepMem || !EdgeArenaMem)
+        u32 NextIdx = (NextDir == LineDir_Down) ? Info.EdgeList[PrevEdge->Below].SortedIdx : Info.EdgeList[PrevEdge->Above].SortedIdx;
+        
+        if (NextIdx == FirstIdx)
         {
-            return EmptyPoly;
-        }
-        
-        edge_info Info = {0};
-        Info.FirstLine = (u8*)LineSweepMem;
-        Info.SecondLine = Info.FirstLine + LineSweepSize;
-        Info.ColHashTable = (u32*)(Info.SecondLine + LineSweepSize);
-        Info.InspectWidth = InspectWidth;
-        Info.TestBlock = GetTestBlockCallback(DType);
-        Info.NoData = NoData;
-        Info.DTypeSize = DTypeSize;
-        Info.EdgeArena = Buffer(EdgeArenaMem, 0, Align(EDGE_DATA_START_SIZE, gSysInfo.PageSize));
-        Info.EdgeList = PushStruct(&Info.EdgeArena, edge); // Inits list with zeroed stub struct [idx 0].
-        Info.EdgeCount++;
-        
-        StopTiming(&Trace);
-        fprintf(stdout, "Init setup: %f\n", Trace.Diff);
-        StartTiming(&Trace);
-        
-        // Get edges line by line.
-        
-        u8* LineReadPtr = Info.SecondLine + DTypeSize;
-        SetNoDataLine(Info.FirstLine, InspectWidth, NoData, DType);
-        CopyData(Info.SecondLine, LineSweepSize, Info.FirstLine, LineSweepSize);
-        for (int Row = 0; Row < Height; Row++)
-        {
-            GDALDatasetRasterIO(DS, GF_Read, 0, Row, Width, 1, LineReadPtr, Width, 1, DType, 1, 0, 0, 0, 0);
-            if (!ProcessSweepLine(&Info, Row)) return EmptyPoly;
-            CopyData(Info.FirstLine, LineSweepSize, Info.SecondLine, LineSweepSize);
-        }
-        SetNoDataLine(Info.SecondLine, InspectWidth, NoData, DType);
-        if (!ProcessSweepLine(&Info, Height)) return EmptyPoly;
-        
-        StopTiming(&Trace);
-        fprintf(stdout, "Sweep line: %f\n", Trace.Diff);
-        StartTiming(&Trace);
-        
-        // Sort EdgeList according to connectedness
-        
-        Info.SortedEdges = PushSize(&Info.EdgeArena, sizeof(u32) * Info.EdgeCount, u32);
-        for (usz EdgeIdx = 1; EdgeIdx < Info.EdgeCount; EdgeIdx++)
-        {
-            Info.SortedEdges[EdgeIdx] = EdgeIdx;
-            Info.EdgeList[EdgeIdx].SortedIdx = EdgeIdx;
-        }
-        
-        usz PolyDataSize = Align(RING_DATA_START_SIZE + (Info.EdgeCount * sizeof(v2)), gSysInfo.PageSize);
-        if ((Poly.Rings = (ring_info*)GetMemory(PolyDataSize, 0, MEM_WRITE)) == NULL)
-        {
-            return EmptyPoly;
-        }
-        ring_info* Ring = Poly.Rings;
-        
-        StopTiming(&Trace);
-        fprintf(stdout, "Pre-loop: %f\n", Trace.Diff);
-        StartTiming(&Trace);
-        
-        u32 FirstIdx = 1;
-        bbox2 BBox = BBox2(DBL_MAX, DBL_MAX, -DBL_MAX, -DBL_MAX);
-        line_dir PrevDir = LineDir_Right; // Always begins to the right.
-        WriteVertexPair(Ring, Affine, Info.EdgeList, &Info.SortedEdges[FirstIdx], &BBox);
-        
-        for (u32 InsertIdx = 3; InsertIdx < Info.EdgeCount; InsertIdx += 2)
-        {
-            edge* PrevEdge = &Info.EdgeList[Info.SortedEdges[InsertIdx-1]];
-            line_dir NextDir = GetLineDirection(PrevDir, PrevEdge);
+            // Repeat first vertex of ring to close it.
+            Ring->Vertices[Ring->NumVertices++] = Ring->Vertices[0];
+            Poly.NumRings++;
+            Poly.NumVertices += Ring->NumVertices;
             
-            u32 NextIdx = (NextDir == LineDir_Down) ? Info.EdgeList[PrevEdge->Below].SortedIdx : Info.EdgeList[PrevEdge->Above].SortedIdx;
+            tree_node* Node = (tree_node*)&Ring->Vertices[Ring->NumVertices];
+            Node->BBoxArea = (BBox.Max.X - BBox.Min.X) * (BBox.Max.Y - BBox.Min.Y);
+            Node->RingOffset = (usz)Node - (usz)Ring;
+            BBox = BBox2(DBL_MAX, DBL_MAX, -DBL_MAX, -DBL_MAX);
             
-            if (NextIdx == FirstIdx)
+            // New ring.
+            Ring = (ring_info*)&Node[1];
+            usz RequiredSize = (Info.EdgeCount - InsertIdx + 1) * sizeof(v2) + sizeof(ring_info) + sizeof(tree_node);
+            usz RingOffset = (usz)Ring - (usz)Poly.Rings;
+            usz RemainingSize = PolyDataSize - RingOffset;
+            
+            if (RequiredSize > RemainingSize)
             {
-                // Repeat first vertex of ring to close it.
-                Ring->Vertices[Ring->NumVertices++] = Ring->Vertices[0];
-                Poly.NumRings++;
-                Poly.NumVertices += Ring->NumVertices;
+                // Not supposed to reach here often. Only if raster has a lot of rings.
                 
-                tree_node* Node = (tree_node*)&Ring->Vertices[Ring->NumVertices];
-                Node->BBoxArea = (BBox.Max.X - BBox.Min.X) * (BBox.Max.Y - BBox.Min.Y);
-                Node->Ring = Ring;
-                BBox = BBox2(DBL_MAX, DBL_MAX, -DBL_MAX, -DBL_MAX);
-                
-                // New ring.
-                Ring = (ring_info*)&Node[1];
-                usz RequiredSize = (Info.EdgeCount - InsertIdx + 1) * sizeof(v2) + sizeof(ring_info) + sizeof(tree_node);
-                usz RingOffset = (usz)Ring - (usz)Poly.Rings;
-                usz RemainingSize = PolyDataSize - RingOffset;
-                
-                if (RequiredSize > RemainingSize)
+                usz NewPolyDataSize = PolyDataSize + gSysInfo.PageSize;
+                void* NewPolyData = GetMemory(NewPolyDataSize, 0, MEM_WRITE);
+                if (!NewPolyData)
                 {
-                    // Not supposed to reach here often. Only if raster has a lot of rings.
-                    
-                    usz NewPolyDataSize = PolyDataSize + gSysInfo.PageSize;
-                    void* NewPolyData = GetMemory(NewPolyDataSize, 0, MEM_WRITE);
-                    if (!NewPolyData)
-                    {
-                        FreeMemory(Poly.Rings);
-                        return EmptyPoly;
-                    }
-                    CopyData(NewPolyData, NewPolyDataSize, Poly.Rings, PolyDataSize);
                     FreeMemory(Poly.Rings);
-                    Poly.Rings = (ring_info*)NewPolyData;
-                    PolyDataSize = NewPolyDataSize;
-                    Ring = (ring_info*)((u8*)Poly.Rings + RingOffset);
+                    return EmptyPoly;
                 }
-                
-                WriteVertexPair(Ring, Affine, Info.EdgeList, &Info.SortedEdges[InsertIdx], &BBox);
-                
-                FirstIdx = InsertIdx;
-                edge* FirstEdge = &Info.EdgeList[Info.SortedEdges[FirstIdx]];
-                edge* SecondEdge = &Info.EdgeList[Info.SortedEdges[FirstIdx+1]];
-                PrevDir = (SecondEdge->Col > FirstEdge->Col) ? LineDir_Right : LineDir_Left;
+                CopyData(NewPolyData, NewPolyDataSize, Poly.Rings, PolyDataSize);
+                FreeMemory(Poly.Rings);
+                Poly.Rings = (ring_info*)NewPolyData;
+                PolyDataSize = NewPolyDataSize;
+                Ring = (ring_info*)((u8*)Poly.Rings + RingOffset);
             }
             
+            WriteVertexPair(Ring, Affine, Info.EdgeList, &Info.SortedEdges[InsertIdx], &BBox);
+            
+            FirstIdx = InsertIdx;
+            edge* FirstEdge = &Info.EdgeList[Info.SortedEdges[FirstIdx]];
+            edge* SecondEdge = &Info.EdgeList[Info.SortedEdges[FirstIdx+1]];
+            PrevDir = (SecondEdge->Col > FirstEdge->Col) ? LineDir_Right : LineDir_Left;
+        }
+        
+        else
+        {
+            u32* Insert = &Info.SortedEdges[InsertIdx];
+            u32* Next = &Info.SortedEdges[NextIdx];
+            
+            edge* InsertEdge = &Info.EdgeList[Insert[0]];
+            edge* NextEdge = &Info.EdgeList[Next[0]];
+            
+            u32 TmpA = Insert[0];
+            u32 TmpB = Insert[1];
+            
+            PrevDir = GetLineDirection(NextDir, NextEdge);
+            if (PrevDir == LineDir_Right)
+            {
+                Insert[0] = Next[0];
+                Insert[1] = Next[1];
+                Next[0] = TmpA;
+                Next[1] = TmpB;
+                
+                InsertEdge[0].SortedIdx = NextIdx;
+                InsertEdge[1].SortedIdx = NextIdx+1;
+                NextEdge[0].SortedIdx = InsertIdx;
+                NextEdge[1].SortedIdx = InsertIdx+1;
+                
+                WriteVertexPair(Ring, Affine, Info.EdgeList, Insert, &BBox);
+            }
             else
             {
-                u32* Insert = &Info.SortedEdges[InsertIdx];
-                u32* Next = &Info.SortedEdges[NextIdx];
-                
-                edge* InsertEdge = &Info.EdgeList[Insert[0]];
-                edge* NextEdge = &Info.EdgeList[Next[0]];
-                
-                u32 TmpA = Insert[0];
-                u32 TmpB = Insert[1];
-                
-                PrevDir = GetLineDirection(NextDir, NextEdge);
-                if (PrevDir == LineDir_Right)
+                if (InsertIdx != NextIdx-1)
                 {
                     Insert[0] = Next[0];
-                    Insert[1] = Next[1];
-                    Next[0] = TmpA;
-                    Next[1] = TmpB;
+                    Insert[1] = Next[-1];
+                    Next[0] = TmpB;
+                    Next[-1] = TmpA;
                     
-                    InsertEdge[0].SortedIdx = NextIdx;
-                    InsertEdge[1].SortedIdx = NextIdx+1;
+                    InsertEdge[0].SortedIdx = NextIdx-1;
+                    InsertEdge[1].SortedIdx = NextIdx;
                     NextEdge[0].SortedIdx = InsertIdx;
-                    NextEdge[1].SortedIdx = InsertIdx+1;
+                    NextEdge[-1].SortedIdx = InsertIdx+1;
                     
-                    WriteVertexPair(Ring, Affine, Info.EdgeList, Insert, &BBox);
                 }
                 else
                 {
-                    if (InsertIdx != NextIdx-1)
-                    {
-                        Insert[0] = Next[0];
-                        Insert[1] = Next[-1];
-                        Next[0] = TmpB;
-                        Next[-1] = TmpA;
-                        
-                        InsertEdge[0].SortedIdx = NextIdx-1;
-                        InsertEdge[1].SortedIdx = NextIdx;
-                        NextEdge[0].SortedIdx = InsertIdx;
-                        NextEdge[-1].SortedIdx = InsertIdx+1;
-                        
-                    }
-                    else
-                    {
-                        Insert[0] = TmpB;
-                        Insert[1] = TmpA;
-                        
-                        InsertEdge[0].SortedIdx = InsertIdx+1;
-                        InsertEdge[1].SortedIdx = InsertIdx;
-                    }
+                    Insert[0] = TmpB;
+                    Insert[1] = TmpA;
                     
-                    WriteVertexPair(Ring, Affine, Info.EdgeList, Insert, &BBox);
+                    InsertEdge[0].SortedIdx = InsertIdx+1;
+                    InsertEdge[1].SortedIdx = InsertIdx;
                 }
+                
+                WriteVertexPair(Ring, Affine, Info.EdgeList, Insert, &BBox);
             }
         }
-        
-        Ring->Vertices[Ring->NumVertices++] = Ring->Vertices[0];
-        Poly.NumRings++;
-        Poly.NumVertices += Ring->NumVertices;
-        
-        tree_node* Node = (tree_node*)&Ring->Vertices[Ring->NumVertices];
-        Node->BBoxArea = (BBox.Max.X - BBox.Min.X) * (BBox.Max.Y - BBox.Min.Y);
-        Node->Ring = Ring;
-        
-        StopTiming(&Trace);
-        fprintf(stdout, "Loop: %f\n", Trace.Diff);
-        StartTiming(&Trace);
-        
-        // Order polygons by outer/inner.
-        
-        tree_node NullNode = { DBL_MAX, 0, 0, 0, 0 };
-        tree_node* FirstNode = (tree_node*)&Poly.Rings->Vertices[Poly.Rings->NumVertices];
-        tree_node* TargetNode = GetNextTreeNode(FirstNode);
-        for (u32 TargetIdx = 1; TargetIdx < Poly.NumRings; TargetIdx++)
-        {
-            tree_node* OuterNode = &NullNode;
-            tree_node* TestNode = FirstNode;
-            for (u32 TestIdx = 0; TestIdx < Poly.NumRings; TestIdx++)
-            {
-                if (TestNode != TargetNode
-                    && IsRingInsideRing(TargetNode->Ring, TestNode->Ring)
-                    && TestNode->BBoxArea < OuterNode->BBoxArea)
-                {
-                    OuterNode = TestNode;
-                }
-                TestNode = GetNextTreeNode(TestNode);
-            }
-            
-            if (OuterNode != &NullNode)
-            {
-                TargetNode->Parent = OuterNode;
-                if (!OuterNode->Child)
-                {
-                    OuterNode->Child = TargetNode;
-                }
-                else
-                {
-                    tree_node* ChildNode = OuterNode->Child;
-                    while (ChildNode->Sibling)
-                    {
-                        ChildNode = ChildNode->Sibling;
-                    }
-                    ChildNode->Sibling = TargetNode;
-                }
-            }
-            
-            TargetNode = GetNextTreeNode(TargetNode);
-        }
-        
-        StopTiming(&Trace);
-        fprintf(stdout, "Tree creation: %f\n", Trace.Diff);
-        StartTiming(&Trace);
-        
-        ring_info NullRing = {0};
-        ring_info* PrevRing = &NullRing;
-        Node = FirstNode;
-        for (u32 NodeIdx = 0; NodeIdx < Poly.NumRings; NodeIdx++)
-        {
-            if (Node->Ring->Type == 0)
-            {
-                PrevRing = PrevRing->Next = Node->Ring;
-                if (Node->Child)
-                {
-                    tree_node* ChildNode = Node->Child;
-                    do
-                    {
-                        ChildNode->Ring->Type = 1;
-                        PrevRing = PrevRing->Next = ChildNode->Ring;
-                        ChildNode= ChildNode->Sibling;
-                    } while (ChildNode);
-                }
-            }
-            Node = GetNextTreeNode(Node);
-        }
-        
-        StopTiming(&Trace);
-        fprintf(stdout, "Tree ordering: %f\n", Trace.Diff);
     }
-    else
+    
+    Ring->Vertices[Ring->NumVertices++] = Ring->Vertices[0];
+    Poly.NumRings++;
+    Poly.NumVertices += Ring->NumVertices;
+    
+    tree_node* Node = (tree_node*)&Ring->Vertices[Ring->NumVertices];
+    Node->BBoxArea = (BBox.Max.X - BBox.Min.X) * (BBox.Max.Y - BBox.Min.Y);
+    Node->RingOffset = (usz)Node - (usz)Ring;
+    
+    // Order polygons by outer/inner.
+    
+    tree_node NullNode = { DBL_MAX, 0, 0, 0, 0 };
+    tree_node* FirstNode = (tree_node*)&Poly.Rings->Vertices[Poly.Rings->NumVertices];
+    tree_node* TargetNode = GetNextTreeNode(FirstNode);
+    for (u32 TargetIdx = 1; TargetIdx < Poly.NumRings; TargetIdx++)
     {
-        // Outline is raster BBox.
-        Poly.NumVertices = 5;
-        Poly.NumRings = 1;
+        tree_node* OuterNode = &NullNode;
+        tree_node* TestNode = FirstNode;
+        for (u32 TestIdx = 0; TestIdx < Poly.NumRings; TestIdx++)
+        {
+            if (TestNode != TargetNode
+                && IsRingInsideRing(GetRingFrom(TargetNode), GetRingFrom(TestNode))
+                && TestNode->BBoxArea < OuterNode->BBoxArea)
+            {
+                OuterNode = TestNode;
+            }
+            TestNode = GetNextTreeNode(TestNode);
+        }
         
-        usz PolyDataSize = sizeof(ring_info) + (5 * sizeof(v2));
-        ring_info* Ring = Poly.Rings = (ring_info*)GetMemory(PolyDataSize, 0, MEM_WRITE);
-        Ring->NumVertices = 5;
-        Ring->Vertices[0] = Ring->Vertices[4] = V2(Affine[0], Affine[3]);
-        Ring->Vertices[1] = V2(Affine[0] + (Width * Affine[1]), Affine[3]);
-        Ring->Vertices[2] = V2(Affine[0] + (Width * Affine[1]), Affine[3] + (Height * Affine[5]));
-        Ring->Vertices[3] = V2(Affine[0], Affine[3] + (Height * Affine[5]));
+        if (OuterNode != &NullNode)
+        {
+            TargetNode->Parent = OuterNode;
+            if (!OuterNode->Child)
+            {
+                OuterNode->Child = TargetNode;
+            }
+            else
+            {
+                tree_node* ChildNode = OuterNode->Child;
+                while (ChildNode->Sibling)
+                {
+                    ChildNode = ChildNode->Sibling;
+                }
+                ChildNode->Sibling = TargetNode;
+            }
+        }
+        
+        TargetNode = GetNextTreeNode(TargetNode);
+    }
+    
+    ring_info NullRing = {0};
+    ring_info* PrevRing = &NullRing;
+    Node = FirstNode;
+    for (u32 NodeIdx = 0; NodeIdx < Poly.NumRings; NodeIdx++)
+    {
+        ring_info* Ring = GetRingFrom(Node);
+        if (Ring->Type == 0)
+        {
+            PrevRing = PrevRing->Next = Ring;
+            if (Node->Child)
+            {
+                tree_node* ChildNode = Node->Child;
+                do
+                {
+                    ring_info* ChildRing = GetRingFrom(ChildNode);
+                    ChildRing->Type = 1;
+                    PrevRing = PrevRing->Next = ChildRing;
+                    ChildNode= ChildNode->Sibling;
+                } while (ChildNode);
+            }
+        }
+        Node = GetNextTreeNode(Node);
     }
     
     return Poly;
 }
 
 external poly_info
-RasterDSToOutline(GDALDatasetH DS)
-{
-    poly_info Poly = RasterToOutline(DS);
-    return Poly;
-}
-
-external poly_info
-RasterPathToOutline(char* SrcRasterPath)
+BBoxOutline(GDALDatasetH DS, u8* BBoxBuffer)
 {
     poly_info Poly = {0};
     
-    GDALDatasetH DS = GDALOpen(SrcRasterPath, GA_ReadOnly);
-    if (DS)
-    {
-        Poly = RasterToOutline(DS);
-        
-        timing Trace;
-        StartTiming(&Trace);
-        GDALClose(DS);
-        StopTiming(&Trace);
-        fprintf(stdout, "Closing GDAL: %f\n", Trace.Diff);
-    }
+    // Outline is raster BBox.
+    Poly.NumVertices = 5;
+    Poly.NumRings = 1;
+    
+    int Width = GDALGetRasterXSize(DS);
+    int Height = GDALGetRasterYSize(DS);
+    double Affine[6];
+    GDALGetGeoTransform(DS, Affine);
+    
+    usz PolyDataSize = BBOX_BUFFER_SIZE;
+    Poly.Rings = (ring_info*)BBoxBuffer;
+    Poly.Rings->NumVertices = 5;
+    Poly.Rings->Vertices[0] = Poly.Rings->Vertices[4] = V2(Affine[0], Affine[3]);
+    Poly.Rings->Vertices[1] = V2(Affine[0] + (Width * Affine[1]), Affine[3]);
+    Poly.Rings->Vertices[2] = V2(Affine[0] + (Width * Affine[1]), Affine[3] + (Height * Affine[5]));
+    Poly.Rings->Vertices[3] = V2(Affine[0], Affine[3] + (Height * Affine[5]));
     
     return Poly;
 }
