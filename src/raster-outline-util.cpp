@@ -1,11 +1,19 @@
 #include "raster-outline.h"
 #include "geotypes-shp.h"
 
+#define USAGE_CODE "Usage: raster-outline.exe [input_raster] [value] [bands]\n" \
+"    > input_raster: Path to raster from which to extract the outline.\n" \
+"    > value: Pixel value of the outline. Alternatively 'nodata' to outline valid pixels, " \
+"or 'bbox' to outline the border of the raster.\n" \
+"    > bands: Bands to investigate the value in. Must be comma-separated, ex: 2,4,5,8.\n" \
+"Example: raster-outline.exe path/to/raster/image.ecw 255 1,2,3\n" \
+"Output: Shapefile with a single multipolygon feature, created at the same path as image.\n"
+
 int main(int Argc, char** Argv)
 {
     if (Argc != 4)
     {
-        fprintf(stderr, "Error: Incorrect number of parameters.\n");
+        fprintf(stderr, "Error: Incorrect number of parameters.\n" USAGE_CODE);
         return -1;
     }
     
@@ -22,14 +30,26 @@ int main(int Argc, char** Argv)
     u8 BBoxBuffer[BBOX_BUFFER_SIZE] = {0};
     poly_info Poly = {0};
     
-    int BandsToCheck = atoi(Argv[3]);
+    string BandList = String(Argv[3], strlen(Argv[3]), 0, EC_ASCII);
+    int* Bands = (int*)GetMemoryFromHeap((BandList.Size/2 + 1) * sizeof(int));
+    int BandCount = 0;
+    for (usz Idx = 0
+         ; (Idx = CharInString(',', BandList, RETURN_IDX_FIND)) != INVALID_IDX
+         ; BandList.Base += Idx, BandList.WriteCur -= Idx)
+    {
+        string Number = String(BandList.Base, Idx, 0, EC_ASCII);
+        Bands[BandCount++] = StringToInt(Number);
+        Idx++;
+    }
+    Bands[BandCount++] = StringToInt(BandList);
+    
     if (!memcmp(Argv[2], "nodata", 6))
     {
         GDALRasterBandH Band = GDALGetRasterBand(DS, 1);
         int RasterHasNoData = 0;
         double Value = GDALGetRasterNoDataValue(Band, &RasterHasNoData);
         
-        Poly = (RasterHasNoData) ? RasterToOutline(DS, Value, BandsToCheck, NULL) : BBoxOutline(DS, BBoxBuffer);
+        Poly = (RasterHasNoData) ? RasterToOutline(DS, Value, TestType_NotEqual, BandCount, Bands) : BBoxOutline(DS, BBoxBuffer);
     }
     else if (!memcmp(Argv[2], "bbox", 4))
     {
@@ -38,7 +58,7 @@ int main(int Argc, char** Argv)
     else
     {
         double Value = atof(Argv[2]);
-        Poly = RasterToOutline(DS, Value, BandsToCheck, NULL);
+        Poly = RasterToOutline(DS, Value, TestType_Equal, BandCount, Bands);
     }
     
     GDALClose(DS);

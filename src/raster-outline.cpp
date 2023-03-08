@@ -1,4 +1,5 @@
 #include "tinybase-platform.h"
+#include "raster-outline-testblock.cpp"
 
 //================================
 // Structs and defines
@@ -6,15 +7,6 @@
 
 #define EDGE_DATA_START_SIZE Kilobyte(64)
 #define RING_DATA_START_SIZE Kilobyte(64)
-
-enum edge_type
-{
-    EdgeType_TopLeft = 0,
-    EdgeType_TopRight = 1,
-    EdgeType_BottomLeft = 2,
-    EdgeType_BottomRight = 3,
-    EdgeType_None = 4
-};
 
 struct edge
 {
@@ -35,7 +27,6 @@ enum line_dir
     LineDir_None
 };
 
-typedef edge_type (*test_block)(u8*, u8*, u32, u32, double);
 struct edge_info
 {
     u8* FirstLine;
@@ -74,137 +65,6 @@ struct tree_node
 // Functions
 //================================
 
-internal edge_type
-_TestBlockPixels(bool TLNoData, bool TRNoData, bool BLNoData, bool BRNoData)
-{
-    int NoDataCount = TLNoData + TRNoData + BLNoData + BRNoData;
-    if (NoDataCount == 1)
-    {
-        if (TLNoData) return EdgeType_TopLeft;
-        if (TRNoData) return EdgeType_TopRight;
-        if (BLNoData) return EdgeType_BottomLeft;
-        if (BRNoData) return EdgeType_BottomRight;
-    }
-    if (NoDataCount == 3)
-    {
-        if (!TLNoData) return EdgeType_TopLeft;
-        if (!TRNoData) return EdgeType_TopRight;
-        if (!BLNoData) return EdgeType_BottomLeft;
-        if (!BRNoData) return EdgeType_BottomRight;
-    }
-    return EdgeType_None;
-}
-
-internal edge_type
-_TestBlockU8(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _Value)
-{
-    u8* Top = _TopRow;
-    u8* Bottom = _BottomRow;
-    u8 Value = (u8)_Value;
-    
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    for (usz Count = 0; Count < BandCount; Count++)
-    {
-        TLValue &= Top[0] == Value;
-        TRValue &= Top[1] == Value;
-        BLValue &= Bottom[0] == Value;
-        BRValue &= Bottom[1] == Value;
-        
-        Top += InspectWidth;
-        Bottom += InspectWidth;
-    }
-    
-    return _TestBlockPixels(TLValue, TRValue, BLValue, BRValue);
-}
-
-internal edge_type
-_TestBlockU16(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _Value)
-{
-    u16* Top = (u16*)_TopRow;
-    u16* Bottom = (u16*)_BottomRow;
-    u16 Value = (u16)_Value;
-    
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    for (usz Count = 0; Count < BandCount; Count++)
-    {
-        TLValue &= Top[0] == Value;
-        TRValue &= Top[1] == Value;
-        BLValue &= Bottom[0] == Value;
-        BRValue &= Bottom[1] == Value;
-        
-        Top += InspectWidth;
-        Bottom += InspectWidth;
-    }
-    
-    return _TestBlockPixels(TLValue, TRValue, BLValue, BRValue);
-}
-
-internal edge_type
-_TestBlockU32(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _Value)
-{
-    u32* Top = (u32*)_TopRow;
-    u32* Bottom = (u32*)_BottomRow;
-    u32 Value = (u32)_Value;
-    
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    for (usz Count = 0; Count < BandCount; Count++)
-    {
-        TLValue &= Top[0] == Value;
-        TRValue &= Top[1] == Value;
-        BLValue &= Bottom[0] == Value;
-        BRValue &= Bottom[1] == Value;
-        
-        Top += InspectWidth;
-        Bottom += InspectWidth;
-    }
-    
-    return _TestBlockPixels(TLValue, TRValue, BLValue, BRValue);
-}
-
-internal edge_type
-_TestBlockF32(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _Value)
-{
-    f32* Top = (f32*)_TopRow;
-    f32* Bottom = (f32*)_BottomRow;
-    f32 Value = (f32)_Value;
-    
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    for (usz Count = 0; Count < BandCount; Count++)
-    {
-        TLValue &= Top[0] == Value;
-        TRValue &= Top[1] == Value;
-        BLValue &= Bottom[0] == Value;
-        BRValue &= Bottom[1] == Value;
-        
-        Top += InspectWidth;
-        Bottom += InspectWidth;
-    }
-    
-    return _TestBlockPixels(TLValue, TRValue, BLValue, BRValue);
-}
-
-internal edge_type
-_TestBlockF64(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _Value)
-{
-    f64* Top = (f64*)_TopRow;
-    f64* Bottom = (f64*)_BottomRow;
-    f64 Value = (f64)_Value;
-    
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    for (usz Count = 0; Count < BandCount; Count++)
-    {
-        TLValue &= Top[0] == Value;
-        TRValue &= Top[1] == Value;
-        BLValue &= Bottom[0] == Value;
-        BRValue &= Bottom[1] == Value;
-        
-        Top += InspectWidth;
-        Bottom += InspectWidth;
-    }
-    
-    return _TestBlockPixels(TLValue, TRValue, BLValue, BRValue);
-}
-
 internal usz
 GetDTypeSize(GDALDataType DType)
 {
@@ -218,22 +78,6 @@ GetDTypeSize(GDALDataType DType)
         case GDT_Float32: return 4;
         case GDT_Float64: return 8;
         default:          return 0;
-    }
-}
-
-internal test_block
-GetTestBlockCallback(GDALDataType DType)
-{
-    switch (DType)
-    {
-        case GDT_Byte:    return _TestBlockU8 ;
-        case GDT_UInt16:
-        case GDT_Int16:   return _TestBlockU16 ;
-        case GDT_UInt32:
-        case GDT_Int32:   return _TestBlockU32;
-        case GDT_Float32: return _TestBlockF32;
-        case GDT_Float64: return _TestBlockF64;
-        default:          return NULL;
     }
 }
 
@@ -287,6 +131,26 @@ SetNoDataLine(u8* Line, int Width, double NoData, GDALDataType DType)
     }
 }
 
+internal u32
+RegisterEdge(edge_info* Info, buffer* Arena, int Row, int Col, edge_type Type)
+{
+    edge* NewEdge = PushStruct(Arena, edge);
+    *NewEdge = { Type, Row, Col, 0, 0 };
+    return Info->EdgeCount++;
+}
+
+internal void
+UpdateAboveBelowRef(edge_info* Info, int Col, edge* NewEdge, u32 NewEdgeIdx)
+{
+    u32 AboveEdgeIdx = Info->ColHashTable[Col];
+    if (AboveEdgeIdx > 0)
+    {
+        edge* AboveEdge = &Info->EdgeList[AboveEdgeIdx];
+        NewEdge->Above = AboveEdgeIdx;
+        AboveEdge->Below = NewEdgeIdx;
+    }
+}
+
 internal bool
 ProcessSweepLine(edge_info* Info, int Row)
 {
@@ -298,9 +162,8 @@ ProcessSweepLine(edge_info* Info, int Row)
         edge_type Type = Info->TestBlock(FirstLine, SecondLine, Info->InspectWidth, Info->BandCount, Info->Value);
         if (Type != EdgeType_None)
         {
-            u32 NewEdgeIdx = Info->EdgeCount++;
-            u32 RequiredSize = Info->EdgeCount * (sizeof(edge) + sizeof(u32)); // u32 is for sorted index.
-            
+            Info->EdgeCount += (Type >= EdgeType_TopLeftBottomRight) ? 2 : 1;
+            u32 RequiredSize = Info->EdgeCount * (sizeof(edge)+sizeof(u32)); // u32 is for sorted index.
             if (Arena->Size < RequiredSize)
             {
                 usz NewAllocSize = Max(Arena->Size * 2, RequiredSize);
@@ -317,17 +180,29 @@ ProcessSweepLine(edge_info* Info, int Row)
                 Info->EdgeList = (edge*)NewAlloc;
             }
             
-            edge* NewEdge = PushStruct(Arena, edge);
-            *NewEdge = { Type, Row, Col, 0, 0 };
-            
-            u32 AboveEdgeIdx = Info->ColHashTable[Col];
-            if (AboveEdgeIdx > 0)
+            if (Type == EdgeType_TopLeftBottomRight)
             {
-                edge* AboveEdge = &Info->EdgeList[AboveEdgeIdx];
-                NewEdge->Above = AboveEdgeIdx;
-                AboveEdge->Below = NewEdgeIdx;
+                edge* NewEdges = PushSize(Arena, sizeof(edge)*2, edge);
+                NewEdges[0] = { EdgeType_TopLeft, Row, Col, 0, 0 };
+                NewEdges[1] = { EdgeType_BottomRight, Row, Col, 0, 0 };
+                UpdateAboveBelowRef(Info, Col, NewEdges, Info->EdgeCount-2);
+                Info->ColHashTable[Col] = Info->EdgeCount-1;
             }
-            Info->ColHashTable[Col] = NewEdgeIdx;
+            else if (Type == EdgeType_TopRightBottomLeft)
+            {
+                edge* NewEdges = PushSize(Arena, sizeof(edge)*2, edge);
+                NewEdges[0] = { EdgeType_BottomLeft, Row, Col, 0, 0 };
+                NewEdges[1] = { EdgeType_TopRight, Row, Col, 0, 0 };
+                UpdateAboveBelowRef(Info, Col, NewEdges+1, Info->EdgeCount-1);
+                Info->ColHashTable[Col] = Info->EdgeCount-2;
+            }
+            else
+            {
+                edge* NewEdges = PushSize(Arena, sizeof(edge), edge);
+                NewEdges[0] = { Type, Row, Col, 0, 0 };
+                UpdateAboveBelowRef(Info, Col, NewEdges, Info->EdgeCount-1);
+                Info->ColHashTable[Col] = Info->EdgeCount-1;
+            }
         }
         FirstLine += Info->DTypeSize;
         SecondLine += Info->DTypeSize;
@@ -385,20 +260,20 @@ GetNextTreeNode(tree_node* Node)
 }
 
 internal bool
-CheckCollision(v2 Test, v2 BP0, v2 BP1, v2 BP2, v2 BP3)
+CheckCollision(v2 Test, v2 P0, v2 P1, v2 P2, v2 P3)
 {
-    if (BP1.X == BP2.X) // Vertical line
+    if (P1.X == P2.X) // Vertical line
     {
-        f64 YMin = Min(BP1.Y, BP2.Y);
-        f64 YMax = Max(BP1.Y, BP2.Y);
-        return (Test.X < BP1.X && Test.Y >= YMin && Test.Y <= YMax);
+        f64 YMin = Min(P1.Y, P2.Y);
+        f64 YMax = Max(P1.Y, P2.Y);
+        return (Test.X < P1.X && Test.Y >= YMin && Test.Y <= YMax);
     }
-    else if (BP1.Y == Test.Y) // Collinear Horizontal line
+    else if (P1.Y == Test.Y) // Collinear Horizontal line
     {
-        f64 XMin = Min(BP1.X, BP2.X);
+        f64 XMin = Min(P1.X, P2.X);
         if (Test.X < XMin)  // Hits ray to the right.
         {
-            return ((BP0.Y < BP1.Y && BP2.Y < BP3.Y) || (BP0.Y > BP1.Y && BP2.Y > BP3.Y));
+            return ((P0.Y < P1.Y && P2.Y < P3.Y) || (P0.Y > P1.Y && P2.Y > P3.Y));
         }
     }
     return false;
@@ -409,10 +284,10 @@ IsRingInsideRing(ring_info* A, ring_info* B)
 {
     if (A != B)
     {
-        v2 Test = A->Vertices[0];
+        v2 Test = (A->Vertices[0].X < A->Vertices[1].X) ? A->Vertices[0] : (A->Vertices[1].X < A->Vertices[2].X) ? A->Vertices[1] : A->Vertices[2];
         usz RayCount = 0;
         
-        // BP1-BP2 is the test line, BP0-BP1 is the line before and BP1-BP2 is the line after.
+        // BP1-BP2 is the test line, BP0-BP1 is the line before and BP2-BP3 is the line after.
         v2 BP0 = B->Vertices[B->NumVertices-2];
         v2 BP1 = B->Vertices[0];
         v2 BP2 = B->Vertices[1];
@@ -435,7 +310,7 @@ IsRingInsideRing(ring_info* A, ring_info* B)
 }
 
 external poly_info
-RasterToOutline(GDALDatasetH DS, double Value, int BandCount, int* BandIdx)
+RasterToOutline(GDALDatasetH DS, double Value, test_type TestType, int BandCount, int* BandIdx)
 {
     poly_info Poly = {0}, EmptyPoly = {0};
     
@@ -477,7 +352,7 @@ RasterToOutline(GDALDatasetH DS, double Value, int BandCount, int* BandIdx)
     Info.ColHashTable = (u32*)(Info.SecondLine + AllBandsLineSize);
     Info.InspectWidth = InspectWidth;
     Info.BandCount = BandCount;
-    Info.TestBlock = GetTestBlockCallback(DType);
+    Info.TestBlock = GetTestBlockCallback(DType, TestType);
     Info.Value = Value;
     Info.DTypeSize = DTypeSize;
     Info.EdgeArena = Buffer(EdgeArenaMem, 0, Align(EDGE_DATA_START_SIZE, gSysInfo.PageSize));
@@ -526,6 +401,11 @@ RasterToOutline(GDALDatasetH DS, double Value, int BandCount, int* BandIdx)
     
     for (u32 InsertIdx = 3; InsertIdx < Info.EdgeCount; InsertIdx += 2)
     {
+        if (InsertIdx == 4801)
+        {
+            int Z = 0;
+        }
+        
         edge* PrevEdge = &Info.EdgeList[Info.SortedEdges[InsertIdx-1]];
         line_dir NextDir = GetLineDirection(PrevDir, PrevEdge);
         
@@ -647,17 +527,20 @@ RasterToOutline(GDALDatasetH DS, double Value, int BandCount, int* BandIdx)
     {
         tree_node* OuterNode = &NullNode;
         tree_node* TestNode = FirstNode;
+        ring_info* TargetRing = GetRingFrom(TargetNode);
         for (u32 TestIdx = 0; TestIdx < Poly.NumRings; TestIdx++)
         {
             if (TestNode != TargetNode
-                && IsRingInsideRing(GetRingFrom(TargetNode), GetRingFrom(TestNode))
+                && IsRingInsideRing(TargetRing, GetRingFrom(TestNode))
                 && TestNode->BBoxArea < OuterNode->BBoxArea)
             {
+                TargetRing->Type++;
                 OuterNode = TestNode;
             }
             TestNode = GetNextTreeNode(TestNode);
         }
         
+        TargetRing->Type &= 0x1; // Forces type to be 0 or 1.
         if (OuterNode != &NullNode)
         {
             TargetNode->Parent = OuterNode;
@@ -685,7 +568,7 @@ RasterToOutline(GDALDatasetH DS, double Value, int BandCount, int* BandIdx)
     for (u32 NodeIdx = 0; NodeIdx < Poly.NumRings; NodeIdx++)
     {
         ring_info* Ring = GetRingFrom(Node);
-        if (Ring->Type == 0)
+        if (Ring->Type  == 0)
         {
             PrevRing = PrevRing->Next = Ring;
             if (Node->Child)
@@ -694,7 +577,6 @@ RasterToOutline(GDALDatasetH DS, double Value, int BandCount, int* BandIdx)
                 do
                 {
                     ring_info* ChildRing = GetRingFrom(ChildNode);
-                    ChildRing->Type = 1;
                     PrevRing = PrevRing->Next = ChildRing;
                     ChildNode= ChildNode->Sibling;
                 } while (ChildNode);
@@ -734,5 +616,8 @@ BBoxOutline(GDALDatasetH DS, u8* BBoxBuffer)
 external void
 FreePolyInfo(poly_info Poly)
 {
-    FreeMemory(Poly.Rings);
+    if (Poly.Rings)
+    {
+        FreeMemory(Poly.Rings);
+    }
 }
