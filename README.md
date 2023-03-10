@@ -18,11 +18,11 @@ The raster outline tool takes a target pixel value and a source raster, and outp
 
 **Example 2**: Inspecting the raster interior for out-of-bounds pixels by passing a value that should not be present in it and outlining all matching pixels.
 
-![Out-of-bounds values inside image rectangle](https://github.com/robertofig/RasterTools/blob/master/docs/outline-2.png?raw=true)
+![Out-of-bounds values inside image rectangle](https://github.com/robertofig/RasterTools/blob/master/docs/outline-2.PNG?raw=true)
 
 **Example 3**: Selecting region from DEM that stands above historical high tide level, by passing that level as target value and selecting all pixels above it.
 
-![Polygons represent areas never before flooded](https://github.com/robertofig/RasterTools/blob/master/docs/outline-3.png?raw=true)
+![Polygons represent areas never before flooded](https://github.com/robertofig/RasterTools/blob/master/docs/outline-3.PNG?raw=true)
 
 #### 2) Raster Cut
 
