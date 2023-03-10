@@ -26,7 +26,7 @@
 // polygon outline of the entire image area. Memory is not allocated by
 // the internals, but instead expected to be passed by the application,
 // of at least size BBOX_BUFFER_SIZE. The result can be read the same way
-// as the poly_info of RasterToOutline().// 
+// as the poly_info of RasterToOutline().
 //=========================================================================
 #define RASTER_OUTLINE_H
 
@@ -37,8 +37,9 @@
 
 enum test_type
 {
-    TestType_Equal,    // Outlines all pixels of target value.
-    TestType_NotEqual  // Outlines all pixels not of target value.
+    TestType_Equal,      // Pixel == target value.
+    TestType_NotEqual,   // Pixels != target value.
+    TestType_BiggerThan  // Pixels >= target value.
 };
 
 struct ring_info
