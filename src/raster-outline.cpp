@@ -36,7 +36,8 @@ struct edge_info
     u32 InspectWidth;
     u32 BandCount;
     test_block TestBlock;
-    double Value;
+    double ValueA;
+    double ValueB;
     u32 DTypeSize;
     
     buffer EdgeArena;
@@ -159,7 +160,7 @@ ProcessSweepLine(edge_info* Info, int Row)
     u8* SecondLine = Info->SecondLine;
     for (int Col = 0; Col < Info->InspectWidth-1; Col++)
     {
-        edge_type Type = Info->TestBlock(FirstLine, SecondLine, Info->InspectWidth, Info->BandCount, Info->Value);
+        edge_type Type = Info->TestBlock(FirstLine, SecondLine, Info->InspectWidth, Info->BandCount, Info->ValueA, Info->ValueB);
         if (Type != EdgeType_None)
         {
             Info->EdgeCount += (Type >= EdgeType_TopLeftBottomRight) ? 2 : 1;
@@ -310,7 +311,7 @@ IsRingInsideRing(ring_info* A, ring_info* B)
 }
 
 external poly_info
-RasterToOutline(GDALDatasetH DS, double Value, test_type TestType, int BandCount, int* BandIdx)
+RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestType, int BandCount, int* BandIdx)
 {
     poly_info Poly = {0}, EmptyPoly = {0};
     
@@ -331,7 +332,8 @@ RasterToOutline(GDALDatasetH DS, double Value, test_type TestType, int BandCount
     double NoData = GDALGetRasterNoDataValue(Band, &RasterHasNoData); // TODO: Check if DType isn't i64 or u64.
     if (!RasterHasNoData)
     {
-        NoData = (Value == 0) ? 1 : 0;
+        // TODO: What if border value is 0, 1 or 2? Then this won't work. Think of something better.
+        NoData = (ValueA != 0) ? 0 : (ValueB != 1) ? 1 : 2;
     }
     
     // Prepare memory arena.
@@ -353,7 +355,8 @@ RasterToOutline(GDALDatasetH DS, double Value, test_type TestType, int BandCount
     Info.InspectWidth = InspectWidth;
     Info.BandCount = BandCount;
     Info.TestBlock = GetTestBlockCallback(DType, TestType);
-    Info.Value = Value;
+    Info.ValueA = ValueA;
+    Info.ValueB = ValueB;
     Info.DTypeSize = DTypeSize;
     Info.EdgeArena = Buffer(EdgeArenaMem, 0, Align(EDGE_DATA_START_SIZE, gSysInfo.PageSize));
     Info.EdgeList = PushStruct(&Info.EdgeArena, edge); // Inits list with zeroed stub struct [idx 0].

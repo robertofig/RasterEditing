@@ -37,10 +37,11 @@
 
 enum test_type
 {
-    TestType_Equal,      // Pixel == target value.
-    TestType_NotEqual,   // Pixel != target value.
-    TestType_BiggerThan, // Pixel >= target value.
-    TestType_LessThan    // Pixel <= target value.
+    TestType_Equal,      // Pixel == target value A.
+    TestType_NotEqual,   // Pixel != target value A.
+    TestType_BiggerThan, // Pixel >= target value A.
+    TestType_LessThan,   // Pixel <= target value A.
+    TestType_Between     // target value A >= Pixel <= target value B.
 };
 
 struct ring_info
@@ -59,14 +60,19 @@ struct poly_info
     ring_info* Rings;
 };
 
-external poly_info RasterToOutline(GDALDatasetH DS, double Value, test_type TestType, int BandCount, int* BandIdx);
+external poly_info RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestType, int BandCount, int* BandIdx);
 
 /* Creates outline in raster [DS] around pixels that match the [TestType]
- |  condition of pixel [Value]. [BandIdx] is an array of band numbers to be
-|  used for testing, and must be at least [BandCount] big. Each pixel must
-|  pass the test on all specified bands to be eligible for outlining.
-|  [BandIdx] can also be NULL, in this case the function on [BandCount]
-|  number of bands starting from the first raster bands.
+ |  condition of a pixel value. For test types of Equal, NotEqual, BiggerThan,
+|  and LessThan, the conditional value is passed in [ValueA], and [ValueB]
+|  can be passed anything (won't be used); for test of type Between, the lower
+|  value is passed in [ValueA], and the bigger in [ValueB].
+|  
+|  [BandIdx] is an array of band numbers to be used for testing, and must be
+ |  at least [BandCount] big. Each pixel must pass the test on all specified
+ |  bands to be eligible for outlining. [BandIdx] can also be NULL, in this
+ |  case the function on [BandCount] number of bands starting from the first
+ |  raster bands.
 |--- Return: poly_info object with all the outlines, or empty if failure.*/
 
 external poly_info BBoxOutline(GDALDatasetH DS, u8* BBoxBuffer);

@@ -49,7 +49,7 @@ int main(int Argc, char** Argv)
         int RasterHasNoData = 0;
         double Value = GDALGetRasterNoDataValue(Band, &RasterHasNoData);
         
-        Poly = (RasterHasNoData) ? RasterToOutline(DS, Value, TestType_NotEqual, BandCount, Bands) : BBoxOutline(DS, BBoxBuffer);
+        Poly = (RasterHasNoData) ? RasterToOutline(DS, Value, 0, TestType_NotEqual, BandCount, Bands) : BBoxOutline(DS, BBoxBuffer);
     }
     else if (!memcmp(Argv[2], "bbox", 4))
     {
@@ -58,8 +58,7 @@ int main(int Argc, char** Argv)
     else
     {
         double Value = atof(Argv[2]);
-        //Poly = RasterToOutline(DS, Value, TestType_Equal, BandCount, Bands);
-        Poly = RasterToOutline(DS, Value, TestType_BiggerThan, BandCount, Bands);
+        Poly = RasterToOutline(DS, Value, 0, TestType_Equal, BandCount, Bands);
     }
     
     GDALClose(DS);
