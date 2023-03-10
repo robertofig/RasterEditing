@@ -14,15 +14,15 @@ The raster outline tool takes a target pixel value and a source raster, and outp
 
 **Example 1**: Creating an outline around valid pixels of the image by passing the image NoData as target value, and selecting all pixels that are *not* it.
 
-![Outline of valid raster pixels](https://github.com/robertofig/RasterTools/docs/outline-1.png?raw=true)
+![Outline of valid raster pixels](https://github.com/robertofig/RasterTools/blob/master/docs/outline-1.png?raw=true)
 
 **Example 2**: Inspecting the raster interior for out-of-bounds pixels by passing a value that should not be present in it and outlining all matching pixels.
 
-![Out-of-bounds values inside image rectangle](https://github.com/robertofig/RasterTools/docs/outline-2.png?raw=true)
+![Out-of-bounds values inside image rectangle](https://github.com/robertofig/RasterTools/blob/master/docs/outline-2.png?raw=true)
 
 **Example 3**: Selecting region from DEM that stands above historical high tide level, by passing that level as target value and selecting all pixels above it.
 
-![Polygons represent areas never before flooded](https://github.com/robertofig/RasterTools/docs/outline-3.png?raw=true)
+![Polygons represent areas never before flooded](https://github.com/robertofig/RasterTools/blob/master/docs/outline-3.png?raw=true)
 
 #### 2) Raster Cut
 
@@ -30,7 +30,7 @@ The raster cut tool takes a polygon and a list of rasters that overlap it, and r
 
 **Example 1**: Two Landsat-8 images being cut and mosaicked to a starry shape.
 
-![Rasters cut from polygon](https://github.com/robertofig/RasterTools/docs/cut-1.png?raw=true)
+![Rasters cut from polygon](https://github.com/robertofig/RasterTools/blob/master/docs/cut-1.png?raw=true)
 
 ## How to use?
 
