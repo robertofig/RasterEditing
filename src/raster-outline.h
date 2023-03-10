@@ -38,8 +38,9 @@
 enum test_type
 {
     TestType_Equal,      // Pixel == target value.
-    TestType_NotEqual,   // Pixels != target value.
-    TestType_BiggerThan  // Pixels >= target value.
+    TestType_NotEqual,   // Pixel != target value.
+    TestType_BiggerThan, // Pixel >= target value.
+    TestType_LessThan    // Pixel <= target value.
 };
 
 struct ring_info

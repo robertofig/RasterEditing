@@ -273,13 +273,95 @@ TestF64BiggerThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, 
 }
 
 //================================
+// Test for less than
+//================================
+
+#define TEST_FOR_LESSTHAN do { \
+for (usz Count = 0; Count < BandCount; Count++) \
+{ \
+TLValue &= Top[0] <= Value; \
+TRValue &= Top[1] <= Value; \
+BLValue &= Bottom[0] <= Value; \
+BRValue &= Bottom[1] <= Value; \
+Top += InspectWidth; \
+Bottom += InspectWidth; \
+} \
+} while (0);
+
+internal edge_type
+TestU8LessThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _Value)
+{
+    u8* Top = _TopRow;
+    u8* Bottom = _BottomRow;
+    u8 Value = (u8)_Value;
+    
+    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
+    TEST_FOR_LESSTHAN;
+    
+    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+}
+
+internal edge_type
+TestU16LessThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _Value)
+{
+    u16* Top = (u16*)_TopRow;
+    u16* Bottom = (u16*)_BottomRow;
+    u16 Value = (u16)_Value;
+    
+    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
+    TEST_FOR_LESSTHAN;
+    
+    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+}
+
+internal edge_type
+TestU32LessThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _Value)
+{
+    u32* Top = (u32*)_TopRow;
+    u32* Bottom = (u32*)_BottomRow;
+    u32 Value = (u32)_Value;
+    
+    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
+    TEST_FOR_LESSTHAN;
+    
+    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+}
+
+internal edge_type
+TestF32LessThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _Value)
+{
+    f32* Top = (f32*)_TopRow;
+    f32* Bottom = (f32*)_BottomRow;
+    f32 Value = (f32)_Value;
+    
+    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
+    TEST_FOR_LESSTHAN;
+    
+    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+}
+
+internal edge_type
+TestF64LessThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _Value)
+{
+    f64* Top = (f64*)_TopRow;
+    f64* Bottom = (f64*)_BottomRow;
+    f64 Value = (f64)_Value;
+    
+    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
+    TEST_FOR_LESSTHAN;
+    
+    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+}
+
+//================================
 // Test selection
 //================================
 
-global test_block TestCallbacks[3][5] = {
+global test_block TestCallbacks[4][5] = {
     { TestU8Equal, TestU16Equal, TestU32Equal, TestF32Equal, TestF64Equal },
     { TestU8NotEqual, TestU16NotEqual, TestU32NotEqual, TestF32NotEqual, TestF64NotEqual},
-    { TestU8BiggerThan, TestU16BiggerThan, TestU32BiggerThan, TestF32BiggerThan, TestF64BiggerThan }};
+    { TestU8BiggerThan, TestU16BiggerThan, TestU32BiggerThan, TestF32BiggerThan, TestF64BiggerThan },
+    { TestU8LessThan, TestU16LessThan, TestU32LessThan, TestF32LessThan, TestF64LessThan }};
 
 internal test_block
 GetTestBlockCallback(GDALDataType DType, test_type TestType)
