@@ -63,7 +63,6 @@ TestU8Equal(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double
     u8* Top = _TopRow;
     u8* Bottom = _BottomRow;
     u8 ValueA = (u8)_ValueA;
-    u8 ValueB = (u8)_ValueB;
     
     bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
     TEST_FOR_EQUAL;
@@ -77,7 +76,6 @@ TestU16Equal(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, doubl
     u16* Top = (u16*)_TopRow;
     u16* Bottom = (u16*)_BottomRow;
     u16 ValueA = (u16)_ValueA;
-    u16 ValueB = (u16)_ValueB;
     
     bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
     TEST_FOR_EQUAL;
@@ -380,10 +378,10 @@ TestF64LessThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, do
 #define TEST_FOR_BETWEEN do { \
 for (usz Count = 0; Count < BandCount; Count++) \
 { \
-TLValue &= Top[0] >= ValueA && Top[0] <= ValueB; \
-TRValue &= Top[1] >= ValueA && Top[1] <= ValueB; \
-BLValue &= Bottom[0] >= ValueA && Bottom[0] <= ValueB; \
-BRValue &= Bottom[1] >= ValueA && Bottom[1] <= ValueB; \
+TLValue &= (Top[0] >= ValueA) && (Top[0] <= ValueB); \
+TRValue &= (Top[1] >= ValueA) && (Top[1] <= ValueB); \
+BLValue &= (Bottom[0] >= ValueA) && (Bottom[0] <= ValueB); \
+BRValue &= (Bottom[1] >= ValueA) && (Bottom[1] <= ValueB); \
 Top += InspectWidth; \
 Bottom += InspectWidth; \
 } \
@@ -397,10 +395,24 @@ TestU8Between(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, doub
     u8 ValueA = (u8)_ValueA;
     u8 ValueB = (u8)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_BETWEEN;
+    if (Bottom[1] == 255 && Bottom[InspectWidth+1] == 254 && Bottom[InspectWidth*2+1] == 246)
+    {
+        int Z = 0;
+    }
     
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    i32 TLValue = BandCount, TRValue = BandCount, BLValue = BandCount, BRValue = BandCount;
+    //TEST_FOR_BETWEEN;
+    for (usz Count = 0; Count < BandCount; Count++) 
+    { 
+        TLValue -= (Top[0] >= ValueA) && (Top[0] <= ValueB); 
+        TRValue -= (Top[1] >= ValueA) && (Top[1] <= ValueB); 
+        BLValue -= (Bottom[0] >= ValueA) && (Bottom[0] <= ValueB); 
+        BRValue -= (Bottom[1] >= ValueA) && (Bottom[1] <= ValueB); 
+        Top += InspectWidth; 
+        Bottom += InspectWidth; 
+    }
+    
+    return GetBlockEdges(TLValue==0, TRValue==0, BLValue==0, BRValue==0);
 }
 
 internal edge_type

@@ -58,7 +58,8 @@ int main(int Argc, char** Argv)
     else
     {
         double Value = atof(Argv[2]);
-        Poly = RasterToOutline(DS, Value, 0, TestType_Equal, BandCount, Bands);
+        //Poly = RasterToOutline(DS, Value, 0, TestType_Equal, BandCount, Bands);
+        Poly = RasterToOutline(DS, 1, 254, TestType_Between, BandCount, Bands);
     }
     
     GDALClose(DS);
