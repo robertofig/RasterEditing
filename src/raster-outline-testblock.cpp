@@ -398,7 +398,7 @@ TestU8Between(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, doub
     u8 ValueB = (u8)_ValueB;
     
     bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_LESSTHAN;
+    TEST_FOR_BETWEEN;
     
     return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
 }
@@ -412,7 +412,7 @@ TestU16Between(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, dou
     u16 ValueB = (u16)_ValueB;
     
     bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_LESSTHAN;
+    TEST_FOR_BETWEEN;
     
     return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
 }
@@ -426,7 +426,7 @@ TestU32Between(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, dou
     u32 ValueB = (u32)_ValueB;
     
     bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_LESSTHAN;
+    TEST_FOR_BETWEEN;
     
     return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
 }
@@ -440,7 +440,7 @@ TestF32Between(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, dou
     f32 ValueB = (f32)_ValueB;
     
     bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_LESSTHAN;
+    TEST_FOR_BETWEEN;
     
     return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
 }
@@ -454,7 +454,7 @@ TestF64Between(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, dou
     f64 ValueB = (f64)_ValueB;
     
     bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_LESSTHAN;
+    TEST_FOR_BETWEEN;
     
     return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
 }
