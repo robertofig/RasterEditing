@@ -42,10 +42,11 @@ GetBlockEdges(bool TLValue, bool TRValue, bool BLValue, bool BRValue)
 }
 
 //================================
-// Test for equal
+// Test for equal all
 //================================
 
-#define TEST_FOR_EQUAL do { \
+#define TEST_FOR_EQUAL_ALL \
+bool TLValue = true, TRValue = true, BLValue = true, BRValue = true; \
 for (usz Count = 0; Count < BandCount; Count++) \
 { \
 TLValue &= Top[0] == ValueA; \
@@ -55,155 +56,265 @@ BRValue &= Bottom[1] == ValueA; \
 Top += InspectWidth; \
 Bottom += InspectWidth; \
 } \
-} while (0);
+return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
 
 internal edge_type
-TestU8Equal(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestU8EqualAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     u8* Top = _TopRow;
     u8* Bottom = _BottomRow;
     u8 ValueA = (u8)_ValueA;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_EQUAL;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_EQUAL_ALL;
 }
 
 internal edge_type
-TestU16Equal(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestU16EqualAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     u16* Top = (u16*)_TopRow;
     u16* Bottom = (u16*)_BottomRow;
     u16 ValueA = (u16)_ValueA;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_EQUAL;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_EQUAL_ALL;
 }
 
 internal edge_type
-TestU32Equal(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestU32EqualAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     u32* Top = (u32*)_TopRow;
     u32* Bottom = (u32*)_BottomRow;
     u32 ValueA = (u32)_ValueA;
-    u32 ValueB = (u32)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_EQUAL;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_EQUAL_ALL;
 }
 
 internal edge_type
-TestF32Equal(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestF32EqualAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     f32* Top = (f32*)_TopRow;
     f32* Bottom = (f32*)_BottomRow;
     f32 ValueA = (f32)_ValueA;
-    f32 ValueB = (f32)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_EQUAL;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_EQUAL_ALL;
 }
 
 internal edge_type
-TestF64Equal(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestF64EqualAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     f64* Top = (f64*)_TopRow;
     f64* Bottom = (f64*)_BottomRow;
     f64 ValueA = (f64)_ValueA;
-    f64 ValueB = (f64)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_EQUAL;
+    TEST_FOR_EQUAL_ALL;
+}
+
+//================================
+// Test for equal any
+//================================
+
+#define TEST_FOR_EQUAL_ANY \
+bool TLValue = false, TRValue = false, BLValue = false, BRValue = false; \
+for (usz Count = 0; Count < BandCount; Count++) \
+{ \
+TLValue |= Top[0] == ValueA; \
+TRValue |= Top[1] == ValueA; \
+BLValue |= Bottom[0] == ValueA; \
+BRValue |= Bottom[1] == ValueA; \
+Top += InspectWidth; \
+Bottom += InspectWidth; \
+} \
+return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+
+internal edge_type
+TestU8EqualAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    u8* Top = _TopRow;
+    u8* Bottom = _BottomRow;
+    u8 ValueA = (u8)_ValueA;
     
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_EQUAL_ANY;
+}
+
+internal edge_type
+TestU16EqualAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    u16* Top = (u16*)_TopRow;
+    u16* Bottom = (u16*)_BottomRow;
+    u16 ValueA = (u16)_ValueA;
+    
+    TEST_FOR_EQUAL_ANY;
+}
+
+internal edge_type
+TestU32EqualAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    u32* Top = (u32*)_TopRow;
+    u32* Bottom = (u32*)_BottomRow;
+    u32 ValueA = (u32)_ValueA;
+    
+    TEST_FOR_EQUAL_ANY;
+}
+
+internal edge_type
+TestF32EqualAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    f32* Top = (f32*)_TopRow;
+    f32* Bottom = (f32*)_BottomRow;
+    f32 ValueA = (f32)_ValueA;
+    
+    TEST_FOR_EQUAL_ANY;
+}
+
+internal edge_type
+TestF64EqualAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    f64* Top = (f64*)_TopRow;
+    f64* Bottom = (f64*)_BottomRow;
+    f64 ValueA = (f64)_ValueA;
+    
+    TEST_FOR_EQUAL_ANY;
+}
+
+//================================
+// Test for not equal all
+//================================
+
+#define TEST_FOR_NOTEQUAL_ALL \
+bool TLValue = true, TRValue = true, BLValue = true, BRValue = true; \
+for (usz Count = 0; Count < BandCount; Count++) \
+{ \
+TLValue &= Top[0] == ValueA; \
+TRValue &= Top[1] == ValueA; \
+BLValue &= Bottom[0] == ValueA; \
+BRValue &= Bottom[1] == ValueA; \
+Top += InspectWidth; \
+Bottom += InspectWidth; \
+} \
+return GetBlockEdges(!TLValue, !TRValue, !BLValue, !BRValue);
+
+internal edge_type
+TestU8NotEqualAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    u8* Top = _TopRow;
+    u8* Bottom = _BottomRow;
+    u8 ValueA = (u8)_ValueA;
+    
+    TEST_FOR_NOTEQUAL_ALL;
+}
+
+internal edge_type
+TestU16NotEqualAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    u16* Top = (u16*)_TopRow;
+    u16* Bottom = (u16*)_BottomRow;
+    u16 ValueA = (u16)_ValueA;
+    
+    TEST_FOR_NOTEQUAL_ALL;
+}
+
+internal edge_type
+TestU32NotEqualAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    u32* Top = (u32*)_TopRow;
+    u32* Bottom = (u32*)_BottomRow;
+    u32 ValueA = (u32)_ValueA;
+    
+    TEST_FOR_NOTEQUAL_ALL;
+}
+
+internal edge_type
+TestF32NotEqualAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    f32* Top = (f32*)_TopRow;
+    f32* Bottom = (f32*)_BottomRow;
+    f32 ValueA = (f32)_ValueA;
+    
+    TEST_FOR_NOTEQUAL_ALL;
+}
+
+internal edge_type
+TestF64NotEqualAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    f64* Top = (f64*)_TopRow;
+    f64* Bottom = (f64*)_BottomRow;
+    f64 ValueA = (f64)_ValueA;
+    
+    TEST_FOR_NOTEQUAL_ALL;
 }
 
 //================================
 // Test for not equal
 //================================
 
+#define TEST_FOR_NOTEQUAL_ANY \
+bool TLValue = false, TRValue = false, BLValue = false, BRValue = false; \
+for (usz Count = 0; Count < BandCount; Count++) \
+{ \
+TLValue |= Top[0] == ValueA; \
+TRValue |= Top[1] == ValueA; \
+BLValue |= Bottom[0] == ValueA; \
+BRValue |= Bottom[1] == ValueA; \
+Top += InspectWidth; \
+Bottom += InspectWidth; \
+} \
+return GetBlockEdges(!TLValue, !TRValue, !BLValue, !BRValue);
+
 internal edge_type
-TestU8NotEqual(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestU8NotEqualAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     u8* Top = _TopRow;
     u8* Bottom = _BottomRow;
     u8 ValueA = (u8)_ValueA;
-    u8 ValueB = (u8)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_EQUAL;
-    
-    return GetBlockEdges(!TLValue, !TRValue, !BLValue, !BRValue);
+    TEST_FOR_NOTEQUAL_ANY;
 }
 
 internal edge_type
-TestU16NotEqual(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestU16NotEqualAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     u16* Top = (u16*)_TopRow;
     u16* Bottom = (u16*)_BottomRow;
     u16 ValueA = (u16)_ValueA;
-    u16 ValueB = (u16)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_EQUAL;
-    
-    return GetBlockEdges(!TLValue, !TRValue, !BLValue, !BRValue);
+    TEST_FOR_NOTEQUAL_ANY;
 }
 
 internal edge_type
-TestU32NotEqual(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestU32NotEqualAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     u32* Top = (u32*)_TopRow;
     u32* Bottom = (u32*)_BottomRow;
     u32 ValueA = (u32)_ValueA;
-    u32 ValueB = (u32)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_EQUAL;
-    
-    return GetBlockEdges(!TLValue, !TRValue, !BLValue, !BRValue);
+    TEST_FOR_NOTEQUAL_ANY;
 }
 
 internal edge_type
-TestF32NotEqual(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestF32NotEqualAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     f32* Top = (f32*)_TopRow;
     f32* Bottom = (f32*)_BottomRow;
     f32 ValueA = (f32)_ValueA;
-    f32 ValueB = (f32)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_EQUAL;
-    
-    return GetBlockEdges(!TLValue, !TRValue, !BLValue, !BRValue);
+    TEST_FOR_NOTEQUAL_ANY;
 }
 
 internal edge_type
-TestF64NotEqual(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestF64NotEqualAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     f64* Top = (f64*)_TopRow;
     f64* Bottom = (f64*)_BottomRow;
     f64 ValueA = (f64)_ValueA;
-    f64 ValueB = (f64)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_EQUAL;
-    
-    return GetBlockEdges(!TLValue, !TRValue, !BLValue, !BRValue);
+    TEST_FOR_NOTEQUAL_ANY;
 }
 
 //================================
-// Test for bigger than
+// Test for more than all
 //================================
 
-#define TEST_FOR_BIGGERTHAN do { \
+#define TEST_FOR_MORETHAN_ALL \
+bool TLValue = true, TRValue = true, BLValue = true, BRValue = true; \
 for (usz Count = 0; Count < BandCount; Count++) \
 { \
 TLValue &= Top[0] >= ValueA; \
@@ -213,83 +324,131 @@ BRValue &= Bottom[1] >= ValueA; \
 Top += InspectWidth; \
 Bottom += InspectWidth; \
 } \
-} while (0);
+return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
 
 internal edge_type
-TestU8BiggerThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestU8MoreThanAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     u8* Top = _TopRow;
     u8* Bottom = _BottomRow;
     u8 ValueA = (u8)_ValueA;
-    u8 ValueB = (u8)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_BIGGERTHAN;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_MORETHAN_ALL;
 }
 
 internal edge_type
-TestU16BiggerThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestU16MoreThanAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     u16* Top = (u16*)_TopRow;
     u16* Bottom = (u16*)_BottomRow;
     u16 ValueA = (u16)_ValueA;
-    u16 ValueB = (u16)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_BIGGERTHAN;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_MORETHAN_ALL;
 }
 
 internal edge_type
-TestU32BiggerThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestU32MoreThanAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     u32* Top = (u32*)_TopRow;
     u32* Bottom = (u32*)_BottomRow;
     u32 ValueA = (u32)_ValueA;
-    u32 ValueB = (u32)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_BIGGERTHAN;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_MORETHAN_ALL;
 }
 
 internal edge_type
-TestF32BiggerThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestF32MoreThanAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     f32* Top = (f32*)_TopRow;
     f32* Bottom = (f32*)_BottomRow;
     f32 ValueA = (f32)_ValueA;
-    f32 ValueB = (f32)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_BIGGERTHAN;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_MORETHAN_ALL;
 }
 
 internal edge_type
-TestF64BiggerThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestF64MoreThanAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     f64* Top = (f64*)_TopRow;
     f64* Bottom = (f64*)_BottomRow;
     f64 ValueA = (f64)_ValueA;
-    f64 ValueB = (f64)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_BIGGERTHAN;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_MORETHAN_ALL;
 }
 
 //================================
-// Test for less than
+// Test for more than any
 //================================
 
-#define TEST_FOR_LESSTHAN do { \
+#define TEST_FOR_MORETHAN_ANY \
+bool TLValue = false, TRValue = false, BLValue = false, BRValue = false; \
+for (usz Count = 0; Count < BandCount; Count++) \
+{ \
+TLValue |= Top[0] >= ValueA; \
+TRValue |= Top[1] >= ValueA; \
+BLValue |= Bottom[0] >= ValueA; \
+BRValue |= Bottom[1] >= ValueA; \
+Top += InspectWidth; \
+Bottom += InspectWidth; \
+} \
+return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+
+internal edge_type
+TestU8MoreThanAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    u8* Top = _TopRow;
+    u8* Bottom = _BottomRow;
+    u8 ValueA = (u8)_ValueA;
+    
+    TEST_FOR_MORETHAN_ANY;
+}
+
+internal edge_type
+TestU16MoreThanAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    u16* Top = (u16*)_TopRow;
+    u16* Bottom = (u16*)_BottomRow;
+    u16 ValueA = (u16)_ValueA;
+    
+    TEST_FOR_MORETHAN_ANY;
+}
+
+internal edge_type
+TestU32MoreThanAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    u32* Top = (u32*)_TopRow;
+    u32* Bottom = (u32*)_BottomRow;
+    u32 ValueA = (u32)_ValueA;
+    
+    TEST_FOR_MORETHAN_ANY;
+}
+
+internal edge_type
+TestF32MoreThanAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    f32* Top = (f32*)_TopRow;
+    f32* Bottom = (f32*)_BottomRow;
+    f32 ValueA = (f32)_ValueA;
+    
+    TEST_FOR_MORETHAN_ANY;
+}
+
+internal edge_type
+TestF64MoreThanAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    f64* Top = (f64*)_TopRow;
+    f64* Bottom = (f64*)_BottomRow;
+    f64 ValueA = (f64)_ValueA;
+    
+    TEST_FOR_MORETHAN_ANY;
+}
+
+//================================
+// Test for less than all
+//================================
+
+#define TEST_FOR_LESSTHAN_ALL \
+bool TLValue = true, TRValue = true, BLValue = true, BRValue = true; \
 for (usz Count = 0; Count < BandCount; Count++) \
 { \
 TLValue &= Top[0] <= ValueA; \
@@ -299,83 +458,131 @@ BRValue &= Bottom[1] <= ValueA; \
 Top += InspectWidth; \
 Bottom += InspectWidth; \
 } \
-} while (0);
+return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
 
 internal edge_type
-TestU8LessThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestU8LessThanAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     u8* Top = _TopRow;
     u8* Bottom = _BottomRow;
     u8 ValueA = (u8)_ValueA;
-    u8 ValueB = (u8)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_LESSTHAN;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_LESSTHAN_ALL;
 }
 
 internal edge_type
-TestU16LessThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestU16LessThanAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     u16* Top = (u16*)_TopRow;
     u16* Bottom = (u16*)_BottomRow;
     u16 ValueA = (u16)_ValueA;
-    u16 ValueB = (u16)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_LESSTHAN;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_LESSTHAN_ALL;
 }
 
 internal edge_type
-TestU32LessThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestU32LessThanAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     u32* Top = (u32*)_TopRow;
     u32* Bottom = (u32*)_BottomRow;
     u32 ValueA = (u32)_ValueA;
-    u32 ValueB = (u32)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_LESSTHAN;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_LESSTHAN_ALL;
 }
 
 internal edge_type
-TestF32LessThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestF32LessThanAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     f32* Top = (f32*)_TopRow;
     f32* Bottom = (f32*)_BottomRow;
     f32 ValueA = (f32)_ValueA;
-    f32 ValueB = (f32)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_LESSTHAN;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_LESSTHAN_ALL;
 }
 
 internal edge_type
-TestF64LessThan(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestF64LessThanAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     f64* Top = (f64*)_TopRow;
     f64* Bottom = (f64*)_BottomRow;
     f64 ValueA = (f64)_ValueA;
-    f64 ValueB = (f64)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_LESSTHAN;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_LESSTHAN_ALL;
 }
 
 //================================
-// Test for between
+// Test for less than any
 //================================
 
-#define TEST_FOR_BETWEEN do { \
+#define TEST_FOR_LESSTHAN_ANY \
+bool TLValue = false, TRValue = false, BLValue = false, BRValue = false; \
+for (usz Count = 0; Count < BandCount; Count++) \
+{ \
+TLValue |= Top[0] <= ValueA; \
+TRValue |= Top[1] <= ValueA; \
+BLValue |= Bottom[0] <= ValueA; \
+BRValue |= Bottom[1] <= ValueA; \
+Top += InspectWidth; \
+Bottom += InspectWidth; \
+} \
+return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+
+internal edge_type
+TestU8LessThanAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    u8* Top = _TopRow;
+    u8* Bottom = _BottomRow;
+    u8 ValueA = (u8)_ValueA;
+    
+    TEST_FOR_LESSTHAN_ANY;
+}
+
+internal edge_type
+TestU16LessThanAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    u16* Top = (u16*)_TopRow;
+    u16* Bottom = (u16*)_BottomRow;
+    u16 ValueA = (u16)_ValueA;
+    
+    TEST_FOR_LESSTHAN_ANY;
+}
+
+internal edge_type
+TestU32LessThanAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    u32* Top = (u32*)_TopRow;
+    u32* Bottom = (u32*)_BottomRow;
+    u32 ValueA = (u32)_ValueA;
+    
+    TEST_FOR_LESSTHAN_ANY;
+}
+
+internal edge_type
+TestF32LessThanAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    f32* Top = (f32*)_TopRow;
+    f32* Bottom = (f32*)_BottomRow;
+    f32 ValueA = (f32)_ValueA;
+    
+    TEST_FOR_LESSTHAN_ANY;
+}
+
+internal edge_type
+TestF64LessThanAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    f64* Top = (f64*)_TopRow;
+    f64* Bottom = (f64*)_BottomRow;
+    f64 ValueA = (f64)_ValueA;
+    
+    TEST_FOR_LESSTHAN_ANY;
+}
+
+//================================
+// Test for between all
+//================================
+
+#define TEST_FOR_BETWEEN_ALL \
+bool TLValue = true, TRValue = true, BLValue = true, BRValue = true; \
 for (usz Count = 0; Count < BandCount; Count++) \
 { \
 TLValue &= (Top[0] >= ValueA) && (Top[0] <= ValueB); \
@@ -385,102 +592,150 @@ BRValue &= (Bottom[1] >= ValueA) && (Bottom[1] <= ValueB); \
 Top += InspectWidth; \
 Bottom += InspectWidth; \
 } \
-} while (0);
+return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
 
 internal edge_type
-TestU8Between(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestU8BetweenAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     u8* Top = _TopRow;
     u8* Bottom = _BottomRow;
     u8 ValueA = (u8)_ValueA;
     u8 ValueB = (u8)_ValueB;
     
-    if (Bottom[1] == 255 && Bottom[InspectWidth+1] == 254 && Bottom[InspectWidth*2+1] == 246)
-    {
-        int Z = 0;
-    }
-    
-    i32 TLValue = BandCount, TRValue = BandCount, BLValue = BandCount, BRValue = BandCount;
-    //TEST_FOR_BETWEEN;
-    for (usz Count = 0; Count < BandCount; Count++) 
-    { 
-        TLValue -= (Top[0] >= ValueA) && (Top[0] <= ValueB); 
-        TRValue -= (Top[1] >= ValueA) && (Top[1] <= ValueB); 
-        BLValue -= (Bottom[0] >= ValueA) && (Bottom[0] <= ValueB); 
-        BRValue -= (Bottom[1] >= ValueA) && (Bottom[1] <= ValueB); 
-        Top += InspectWidth; 
-        Bottom += InspectWidth; 
-    }
-    
-    return GetBlockEdges(TLValue==0, TRValue==0, BLValue==0, BRValue==0);
+    TEST_FOR_BETWEEN_ALL;
 }
 
 internal edge_type
-TestU16Between(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestU16BetweenAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     u16* Top = (u16*)_TopRow;
     u16* Bottom = (u16*)_BottomRow;
     u16 ValueA = (u16)_ValueA;
     u16 ValueB = (u16)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_BETWEEN;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_BETWEEN_ALL;
 }
 
 internal edge_type
-TestU32Between(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestU32BetweenAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     u32* Top = (u32*)_TopRow;
     u32* Bottom = (u32*)_BottomRow;
     u32 ValueA = (u32)_ValueA;
     u32 ValueB = (u32)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_BETWEEN;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_BETWEEN_ALL;
 }
 
 internal edge_type
-TestF32Between(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestF32BetweenAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     f32* Top = (f32*)_TopRow;
     f32* Bottom = (f32*)_BottomRow;
     f32 ValueA = (f32)_ValueA;
     f32 ValueB = (f32)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_BETWEEN;
-    
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_BETWEEN_ALL;
 }
 
 internal edge_type
-TestF64Between(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+TestF64BetweenAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
 {
     f64* Top = (f64*)_TopRow;
     f64* Bottom = (f64*)_BottomRow;
     f64 ValueA = (f64)_ValueA;
     f64 ValueB = (f64)_ValueB;
     
-    bool TLValue = true, TRValue = true, BLValue = true, BRValue = true;
-    TEST_FOR_BETWEEN;
+    TEST_FOR_BETWEEN_ALL;
+}
+
+//================================
+// Test for between any
+//================================
+
+#define TEST_FOR_BETWEEN_ANY \
+bool TLValue = false, TRValue = false, BLValue = false, BRValue = false; \
+for (usz Count = 0; Count < BandCount; Count++) \
+{ \
+TLValue |= (Top[0] >= ValueA) && (Top[0] <= ValueB); \
+TRValue |= (Top[1] >= ValueA) && (Top[1] <= ValueB); \
+BLValue |= (Bottom[0] >= ValueA) && (Bottom[0] <= ValueB); \
+BRValue |= (Bottom[1] >= ValueA) && (Bottom[1] <= ValueB); \
+Top += InspectWidth; \
+Bottom += InspectWidth; \
+} \
+return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+
+internal edge_type
+TestU8BetweenAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    u8* Top = _TopRow;
+    u8* Bottom = _BottomRow;
+    u8 ValueA = (u8)_ValueA;
+    u8 ValueB = (u8)_ValueB;
     
-    return GetBlockEdges(TLValue, TRValue, BLValue, BRValue);
+    TEST_FOR_BETWEEN_ANY;
+}
+
+internal edge_type
+TestU16BetweenAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    u16* Top = (u16*)_TopRow;
+    u16* Bottom = (u16*)_BottomRow;
+    u16 ValueA = (u16)_ValueA;
+    u16 ValueB = (u16)_ValueB;
+    
+    TEST_FOR_BETWEEN_ANY;
+}
+
+internal edge_type
+TestU32BetweenAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    u32* Top = (u32*)_TopRow;
+    u32* Bottom = (u32*)_BottomRow;
+    u32 ValueA = (u32)_ValueA;
+    u32 ValueB = (u32)_ValueB;
+    
+    TEST_FOR_BETWEEN_ANY;
+}
+
+internal edge_type
+TestF32BetweenAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    f32* Top = (f32*)_TopRow;
+    f32* Bottom = (f32*)_BottomRow;
+    f32 ValueA = (f32)_ValueA;
+    f32 ValueB = (f32)_ValueB;
+    
+    TEST_FOR_BETWEEN_ANY;
+}
+
+internal edge_type
+TestF64BetweenAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, double _ValueA, double _ValueB)
+{
+    f64* Top = (f64*)_TopRow;
+    f64* Bottom = (f64*)_BottomRow;
+    f64 ValueA = (f64)_ValueA;
+    f64 ValueB = (f64)_ValueB;
+    
+    TEST_FOR_BETWEEN_ANY;
 }
 
 //================================
 // Test selection
 //================================
 
-global test_block TestCallbacks[5][5] = {
-    { TestU8Equal, TestU16Equal, TestU32Equal, TestF32Equal, TestF64Equal },
-    { TestU8NotEqual, TestU16NotEqual, TestU32NotEqual, TestF32NotEqual, TestF64NotEqual},
-    { TestU8BiggerThan, TestU16BiggerThan, TestU32BiggerThan, TestF32BiggerThan, TestF64BiggerThan },
-    { TestU8LessThan, TestU16LessThan, TestU32LessThan, TestF32LessThan, TestF64LessThan },
-    { TestU8Between, TestU16Between, TestU32Between, TestF32Between, TestF64Between }};
+global test_block TestCallbacks[][5] = {
+    { TestU8EqualAll, TestU16EqualAll, TestU32EqualAll, TestF32EqualAll, TestF64EqualAll },
+    { TestU8EqualAny, TestU16EqualAny, TestU32EqualAny, TestF32EqualAny, TestF64EqualAny },
+    { TestU8NotEqualAll, TestU16NotEqualAll, TestU32NotEqualAll, TestF32NotEqualAll, TestF64NotEqualAll },
+    { TestU8NotEqualAny, TestU16NotEqualAny, TestU32NotEqualAny, TestF32NotEqualAny, TestF64NotEqualAny },
+    { TestU8MoreThanAll, TestU16MoreThanAll, TestU32MoreThanAll, TestF32MoreThanAll, TestF64MoreThanAll },
+    { TestU8MoreThanAny, TestU16MoreThanAny, TestU32MoreThanAny, TestF32MoreThanAny, TestF64MoreThanAny },
+    { TestU8LessThanAll, TestU16LessThanAll, TestU32LessThanAll, TestF32LessThanAll, TestF64LessThanAll },
+    { TestU8LessThanAny, TestU16LessThanAny, TestU32LessThanAny, TestF32LessThanAny, TestF64LessThanAny },
+    { TestU8BetweenAll, TestU16BetweenAll, TestU32BetweenAll, TestF32BetweenAll, TestF64BetweenAll },
+    { TestU8BetweenAny, TestU16BetweenAny, TestU32BetweenAny, TestF32BetweenAny, TestF64BetweenAny }};
 
 internal test_block
 GetTestBlockCallback(GDALDataType DType, test_type TestType)

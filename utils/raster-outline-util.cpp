@@ -1,17 +1,18 @@
 #include "raster-outline.h"
 #include "geotypes-shp.h"
 
-#define USAGE_CODE "Usage: raster-outline.exe [input_raster] [value] [bands]\n" \
-"    > input_raster: Path to raster from which to extract the outline.\n" \
-"    > value: Pixel value of the outline. Alternatively 'nodata' to outline valid pixels, " \
-"or 'bbox' to outline the border of the raster.\n" \
-"    > bands: Bands to investigate the value in. Must be comma-separated, ex: 2,4,5,8.\n" \
-"Example: raster-outline.exe path/to/raster/image.ecw 255 1,2,3\n" \
-"Output: Shapefile with a single multipolygon feature, created at the same path as image.\n"
+#define USAGE_CODE \
+"Program for creating polygon outlines of raster images. If image does not have a 'no-data' value set, it returns its bounding box instead.\n" \
+" Usage: raster-outline.exe [input] [--bbox]\n" \
+"     > input: Path to raster from which to extract the outline.\n" \
+"     > --bbox (optional): Flag that forces output to be bounding box instead of tight outline.\n" \
+" Example 1: raster-outline.exe image.ecw\n" \
+" Example 2: raster-outline.exe image.tif --bbox\n" \
+" Output: Shapefile with a single multipolygon feature, created at the same path as image.\n"
 
 int main(int Argc, char** Argv)
 {
-    if (Argc != 4)
+    if (Argc < 2 || Argc > 3)
     {
         fprintf(stderr, "Error: Incorrect number of parameters.\n" USAGE_CODE);
         return -1;
@@ -30,39 +31,37 @@ int main(int Argc, char** Argv)
     u8 BBoxBuffer[BBOX_BUFFER_SIZE] = {0};
     poly_info Poly = {0};
     
-    string BandList = String(Argv[3], strlen(Argv[3]), 0, EC_ASCII);
-    int* Bands = (int*)GetMemoryFromHeap((BandList.Size/2 + 1) * sizeof(int));
-    int BandCount = 0;
-    for (usz Idx = 0
-         ; (Idx = CharInString(',', BandList, RETURN_IDX_FIND)) != INVALID_IDX
-         ; BandList.Base += Idx, BandList.WriteCur -= Idx)
+    int RasterHasNoData = 0;
+    GDALRasterBandH Band = GDALGetRasterBand(DS, 1);
+    double NoData = GDALGetRasterNoDataValue(Band, &RasterHasNoData);
+    if (!memcmp(Argv[2], "--bbox", 6) || !RasterHasNoData)
     {
-        string Number = String(BandList.Base, Idx, 0, EC_ASCII);
-        Bands[BandCount++] = StringToInt(Number);
-        Idx++;
-    }
-    Bands[BandCount++] = StringToInt(BandList);
-    
-    if (!memcmp(Argv[2], "nodata", 6))
-    {
-        GDALRasterBandH Band = GDALGetRasterBand(DS, 1);
-        int RasterHasNoData = 0;
-        double Value = GDALGetRasterNoDataValue(Band, &RasterHasNoData);
+        // Outline is raster BBox.
+        Poly.NumVertices = 5;
+        Poly.NumRings = 1;
         
-        Poly = (RasterHasNoData) ? RasterToOutline(DS, Value, 0, TestType_NotEqual, BandCount, Bands) : BBoxOutline(DS, BBoxBuffer);
-    }
-    else if (!memcmp(Argv[2], "bbox", 4))
-    {
-        Poly = BBoxOutline(DS, BBoxBuffer);
+        int Width = GDALGetRasterXSize(DS);
+        int Height = GDALGetRasterYSize(DS);
+        double Affine[6];
+        GDALGetGeoTransform(DS, Affine);
+        
+        usz PolyDataSize = BBOX_BUFFER_SIZE;
+        Poly.Rings = (ring_info*)BBoxBuffer;
+        Poly.Rings->NumVertices = 5;
+        Poly.Rings->Vertices[0] = Poly.Rings->Vertices[4] = V2(Affine[0], Affine[3]);
+        Poly.Rings->Vertices[1] = V2(Affine[0] + (Width * Affine[1]), Affine[3]);
+        Poly.Rings->Vertices[2] = V2(Affine[0] + (Width * Affine[1]), Affine[3] + (Height * Affine[5]));
+        Poly.Rings->Vertices[3] = V2(Affine[0], Affine[3] + (Height * Affine[5]));
     }
     else
     {
-        double Value = atof(Argv[2]);
-        //Poly = RasterToOutline(DS, Value, 0, TestType_Equal, BandCount, Bands);
-        Poly = RasterToOutline(DS, 1, 254, TestType_Between, BandCount, Bands);
+        int BandCount = GDALGetRasterCount(DS);
+        Poly = RasterToOutline(DS, NoData, 0, TestType_EqualAll, BandCount, NULL);
     }
     
     GDALClose(DS);
+    
+    // Write rings to shapefile.
     
     usz OutFullSize = (sizeof(i32) * Poly.NumRings) + (sizeof(v2) * Poly.NumVertices) + 152 + 108 + 35;
     u8* OutShp = (u8*)GetMemory(OutFullSize, 0, MEM_READ|MEM_WRITE);
@@ -80,9 +79,19 @@ int main(int Argc, char** Argv)
         Ring = Ring->Next;
     }
     
+    // Write shapefile to disk.
+    
+    string InPath = String(Argv[1], strlen(Argv[1]), 0, EC_ASCII);
+    usz SepIdx = CharInString('\\', InPath, RETURN_IDX_AFTER|SEARCH_REVERSE);
+    if (SepIdx != INVALID_IDX)
+    {
+        InPath.Base += SepIdx;
+        InPath.WriteCur -= SepIdx;
+    }
+    
     char OutPathBuf[MAX_PATH_SIZE] = {0};
     path OutPath = Path(OutPathBuf);
-    AppendStringToPath(String(Argv[1], strlen(Argv[1]), 0, EC_ASCII), &OutPath);
+    AppendStringToPath(InPath, &OutPath);
     
     usz InsertIdx = OutPath.WriteCur = CharInString('.', OutPath, RETURN_IDX_AFTER|SEARCH_REVERSE);
     AppendStringToString(StrLit("shp"), &OutPath);

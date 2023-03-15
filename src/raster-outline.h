@@ -21,12 +21,6 @@
 // through the [Next] member of ring_info, and checking the [Type] member
 // to see if the ring is outer or inner. The read ends when [Next] returns
 // a NULL pointer.
-//
-// Alternatively the BBoxOutline() function can be used to extract the
-// polygon outline of the entire image area. Memory is not allocated by
-// the internals, but instead expected to be passed by the application,
-// of at least size BBOX_BUFFER_SIZE. The result can be read the same way
-// as the poly_info of RasterToOutline().
 //=========================================================================
 #define RASTER_OUTLINE_H
 
@@ -37,12 +31,16 @@
 
 enum test_type
 {
-    TestType_Equal,      // Pixel == target value A.
-    TestType_NotEqual,   // Pixel != target value A.
-    TestType_BiggerThan, // Pixel >= target value A.
-    TestType_LessThan,   // Pixel <= target value A.
-    TestType_Between,    // target value A >= Pixel <= target value B.
-    TestType_NotBetween  // Pixel < target value A OR Pixel > target value B.
+    TestType_EqualAll,      // Pixel == target value A (All bands).
+    TestType_EqualAny,      // Pixel == target value A (Any band).
+    TestType_NotEqualAll,   // Pixel != target value A (All bands).
+    TestType_NotEqualAny,   // Pixel != target value A (Any band).
+    TestType_MoreThanAll,   // Pixel >= target value A (All bands).
+    TestType_MoreThanAny,   // Pixel >= target value A (Any band).
+    TestType_LessThanAll,   // Pixel <= target value A (All bands).
+    TestType_LessThanAny,   // Pixel <= target value A (Any band).
+    TestType_BetweenAll,    // target value A >= Pixel <= target value B (All bands).
+    TestType_BetweenAny     // target value A >= Pixel <= target value B (Any band).
 };
 
 struct ring_info
@@ -75,13 +73,6 @@ external poly_info RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB
  |  case the function on [BandCount] number of bands starting from the first
  |  raster bands.
 |--- Return: poly_info object with all the outlines, or empty if failure.*/
-
-external poly_info BBoxOutline(GDALDatasetH DS, u8* BBoxBuffer);
-
-/* Creates outline of image boundary of raster [DS] in memory [BBoxBuffer].
-|  [BBoxBuffer] must be allocated by the caller, with BBOX_BUFFER_SIZE bytes
-|  and writing permission (it can be just an array on the stack).
-|--- Return: poly_info object with image boundary outline. */
 
 external void FreePolyInfo(poly_info Poly);
 

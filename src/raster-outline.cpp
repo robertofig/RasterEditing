@@ -54,6 +54,7 @@ struct edge_info
 
 struct tree_node
 {
+    bbox2 BBox;
     f64 BBoxArea;
     u32 RingOffset;
     
@@ -283,37 +284,35 @@ CheckCollision(v2 Test, v2 P0, v2 P1, v2 P2, v2 P3)
 internal bool
 IsRingInsideRing(ring_info* A, ring_info* B)
 {
-    if (A != B)
-    {
-        v2 Test = (A->Vertices[0].X < A->Vertices[1].X) ? A->Vertices[0] : (A->Vertices[1].X < A->Vertices[2].X) ? A->Vertices[1] : A->Vertices[2];
-        usz RayCount = 0;
-        
-        // BP1-BP2 is the test line, BP0-BP1 is the line before and BP2-BP3 is the line after.
-        v2 BP0 = B->Vertices[B->NumVertices-2];
-        v2 BP1 = B->Vertices[0];
-        v2 BP2 = B->Vertices[1];
-        
-        for (u32 BIdx = 2; BIdx < B->NumVertices; BIdx++)
-        {
-            v2 BP3 = B->Vertices[BIdx];
-            RayCount += CheckCollision(Test, BP0, BP1, BP2, BP3);
-            BP0 = BP1;
-            BP1 = BP2;
-            BP2 = BP3;
-        }
-        v2 BP3 = B->Vertices[1];
-        RayCount += CheckCollision(Test, BP0, BP1, BP2, BP3);
-        
-        return RayCount % 2;
-    }
+    v2 Test = (A->Vertices[0].X < A->Vertices[1].X) ? A->Vertices[0] : (A->Vertices[1].X < A->Vertices[2].X) ? A->Vertices[1] : A->Vertices[2];
+    usz RayCount = 0;
     
-    return false;
+    // BP1-BP2 is the test line, BP0-BP1 is the line before and BP2-BP3 is the line after.
+    v2 BP0 = B->Vertices[B->NumVertices-2];
+    v2 BP1 = B->Vertices[0];
+    v2 BP2 = B->Vertices[1];
+    
+    for (u32 BIdx = 2; BIdx < B->NumVertices; BIdx++)
+    {
+        v2 BP3 = B->Vertices[BIdx];
+        RayCount += CheckCollision(Test, BP0, BP1, BP2, BP3);
+        BP0 = BP1;
+        BP1 = BP2;
+        BP2 = BP3;
+    }
+    v2 BP3 = B->Vertices[1];
+    RayCount += CheckCollision(Test, BP0, BP1, BP2, BP3);
+    
+    return RayCount % 2;
 }
 
 external poly_info
 RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestType, int BandCount, int* BandIdx)
 {
     poly_info Poly = {0}, EmptyPoly = {0};
+    
+    timing Trace = {0};
+    StartTiming(&Trace);
     
     GDALRasterBandH Band = GDALGetRasterBand(DS, 1);
     GDALDataType DType = GDALGetRasterDataType(Band);
@@ -362,6 +361,10 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
     Info.EdgeList = PushStruct(&Info.EdgeArena, edge); // Inits list with zeroed stub struct [idx 0].
     Info.EdgeCount++;
     
+    StopTiming(&Trace);
+    fprintf(stdout, "Pre-sweep: %f\n", Trace.Diff);
+    StartTiming(&Trace);
+    
     // Get edges line by line.
     
     u8* LineReadPtr = Info.SecondLine + DTypeSize;
@@ -375,6 +378,10 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
     }
     SetNoDataLine(Info.SecondLine, InspectWidth * BandCount, NoData, DType);
     if (!ProcessSweepLine(&Info, Height)) return EmptyPoly;
+    
+    StopTiming(&Trace);
+    fprintf(stdout, "Sweep: %f\n", Trace.Diff);
+    StartTiming(&Trace);
     
     if (Info.EdgeCount == 1) // No occurances found.
     {
@@ -396,6 +403,10 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
         return EmptyPoly;
     }
     ring_info* Ring = Poly.Rings;
+    
+    StopTiming(&Trace);
+    fprintf(stdout, "Pre-edges: %f\n", Trace.Diff);
+    StartTiming(&Trace);
     
     u32 FirstIdx = 1;
     bbox2 BBox = BBox2(DBL_MAX, DBL_MAX, -DBL_MAX, -DBL_MAX);
@@ -422,6 +433,7 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
             Poly.NumVertices += Ring->NumVertices;
             
             tree_node* Node = (tree_node*)&Ring->Vertices[Ring->NumVertices];
+            Node->BBox = BBox;
             Node->BBoxArea = (BBox.Max.X - BBox.Min.X) * (BBox.Max.Y - BBox.Min.Y);
             Node->RingOffset = (usz)Node - (usz)Ring;
             BBox = BBox2(DBL_MAX, DBL_MAX, -DBL_MAX, -DBL_MAX);
@@ -517,6 +529,10 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
     Poly.NumRings++;
     Poly.NumVertices += Ring->NumVertices;
     
+    StopTiming(&Trace);
+    fprintf(stdout, "Edges: %f\n", Trace.Diff);
+    StartTiming(&Trace);
+    
     tree_node* Node = (tree_node*)&Ring->Vertices[Ring->NumVertices];
     Node->BBoxArea = (BBox.Max.X - BBox.Min.X) * (BBox.Max.Y - BBox.Min.Y);
     Node->RingOffset = (usz)Node - (usz)Ring;
@@ -534,6 +550,7 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
         for (u32 TestIdx = 0; TestIdx < Poly.NumRings; TestIdx++)
         {
             if (TestNode != TargetNode
+                && Intersects(TargetNode->BBox, TestNode->BBox)
                 && IsRingInsideRing(TargetRing, GetRingFrom(TestNode))
                 && TestNode->BBoxArea < OuterNode->BBoxArea)
             {
@@ -565,6 +582,10 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
         TargetNode = GetNextTreeNode(TargetNode);
     }
     
+    StopTiming(&Trace);
+    fprintf(stdout, "Node tree: %f\n", Trace.Diff);
+    StartTiming(&Trace);
+    
     ring_info NullRing = {0};
     ring_info* PrevRing = &NullRing;
     Node = FirstNode;
@@ -588,30 +609,8 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
         Node = GetNextTreeNode(Node);
     }
     
-    return Poly;
-}
-
-external poly_info
-BBoxOutline(GDALDatasetH DS, u8* BBoxBuffer)
-{
-    poly_info Poly = {0};
-    
-    // Outline is raster BBox.
-    Poly.NumVertices = 5;
-    Poly.NumRings = 1;
-    
-    int Width = GDALGetRasterXSize(DS);
-    int Height = GDALGetRasterYSize(DS);
-    double Affine[6];
-    GDALGetGeoTransform(DS, Affine);
-    
-    usz PolyDataSize = BBOX_BUFFER_SIZE;
-    Poly.Rings = (ring_info*)BBoxBuffer;
-    Poly.Rings->NumVertices = 5;
-    Poly.Rings->Vertices[0] = Poly.Rings->Vertices[4] = V2(Affine[0], Affine[3]);
-    Poly.Rings->Vertices[1] = V2(Affine[0] + (Width * Affine[1]), Affine[3]);
-    Poly.Rings->Vertices[2] = V2(Affine[0] + (Width * Affine[1]), Affine[3] + (Height * Affine[5]));
-    Poly.Rings->Vertices[3] = V2(Affine[0], Affine[3] + (Height * Affine[5]));
+    StopTiming(&Trace);
+    fprintf(stdout, "Ordering: %f\n", Trace.Diff);
     
     return Poly;
 }
