@@ -7,6 +7,7 @@
 
 #define EDGE_DATA_START_SIZE Kilobyte(64)
 #define RING_DATA_START_SIZE Kilobyte(64)
+#define QUAD_NODE_CAPACITY 4
 
 struct edge
 {
@@ -52,15 +53,10 @@ struct edge_info
     }
 };
 
-struct tree_node
+struct ring_border
 {
     bbox2 BBox;
-    f64 BBoxArea;
-    u32 RingOffset;
-    
-    tree_node* Parent;
-    tree_node* Sibling;
-    tree_node* Child;
+    bool IsInner;
 };
 
 //================================
@@ -216,7 +212,8 @@ ProcessSweepLine(edge_info* Info, int Row)
 internal line_dir
 GetLineDirection(line_dir PrevDir, edge* Edge)
 {
-    switch (Edge->Type)
+    edge_type Type = (edge_type)((int)Edge->Type & 0xF);
+    switch (Type)
     {
         case EdgeType_TopLeft:     return (PrevDir == LineDir_Right) ? LineDir_Up   : LineDir_Left;
         case EdgeType_TopRight:    return (PrevDir == LineDir_Left)  ? LineDir_Up   : LineDir_Right;
@@ -227,7 +224,7 @@ GetLineDirection(line_dir PrevDir, edge* Edge)
 }
 
 internal void
-WriteVertexPair(ring_info* Ring, double* Affine, edge* EdgeList, u32* EdgeIdx, bbox2* BBox)
+WriteVertexPair(ring_info* Ring, double* Affine, edge* EdgeList, u32* EdgeIdx, ring_border* Border)
 {
     edge* FirstEdge = &EdgeList[EdgeIdx[0]];
     edge* SecondEdge = &EdgeList[EdgeIdx[1]];
@@ -240,24 +237,41 @@ WriteVertexPair(ring_info* Ring, double* Affine, edge* EdgeList, u32* EdgeIdx, b
     f64 Y2 = Affine[3] + Affine[5] * SecondEdge->Row;
     Ring->Vertices[Ring->NumVertices++]= V2(X2, Y2);
     
-    BBox->Min.X = Min(Min(X1, X2), BBox->Min.X);
-    BBox->Min.Y = Min(Min(Y1, Y2), BBox->Min.Y);
-    BBox->Max.X = Max(Max(X1, X2), BBox->Max.X);
-    BBox->Max.Y = Max(Max(Y1, Y2), BBox->Max.Y);
+    if (X1 < X2)
+    {
+        if (X1 < Border->BBox.Min.X) { Border->BBox.Min.X = X1; }
+        if (X2 > Border->BBox.Max.X) { Border->BBox.Max.X = X2; }
+    }
+    else
+    {
+        if (X2 < Border->BBox.Min.X) { Border->BBox.Min.X = X2; }
+        if (X1 > Border->BBox.Max.X) { Border->BBox.Max.X = X1; }
+    }
+    
+    if (Y1 < Y2)
+    {
+        if (Y1 < Border->BBox.Min.Y) { Border->BBox.Min.Y = Y1; }
+        if (Y2 > Border->BBox.Max.Y)
+        {
+            Border->BBox.Max.Y = Y2;
+            Border->IsInner = (int)FirstEdge->Type >> 4;
+        }
+    }
+    else
+    {
+        if (Y2 < Border->BBox.Min.Y) { Border->BBox.Min.Y = Y2; }
+        if (Y1 > Border->BBox.Max.Y)
+        {
+            Border->BBox.Max.Y = Y1;
+            Border->IsInner = (int)SecondEdge->Type >> 4;
+        }
+    }
 }
 
 internal ring_info*
-GetRingFrom(tree_node* Node)
+GetNextRing(ring_info* Ring)
 {
-    ring_info* Result = (ring_info*)((u8*)Node - Node->RingOffset);
-    return Result;
-}
-
-internal tree_node*
-GetNextTreeNode(tree_node* Node)
-{
-    ring_info* NextRing = (ring_info*)&Node[1];
-    tree_node* Result = (tree_node*)&NextRing->Vertices[NextRing->NumVertices];
+    ring_info* Result = (ring_info*)&Ring->Vertices[Ring->NumVertices];
     return Result;
 }
 
@@ -339,7 +353,8 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
     
     u32 ColHashTableSize = Width * sizeof(u32);
     u32 LineSweepSize = InspectWidth * DTypeSize;
-    void* LineSweepMem = GetMemory(LineSweepSize*2*BandCount + ColHashTableSize, 0, MEM_WRITE);
+    usz LineSweepMemSize = LineSweepSize*2*BandCount + ColHashTableSize;
+    void* LineSweepMem = GetMemory(LineSweepMemSize, 0, MEM_WRITE);
     void* EdgeArenaMem = GetMemory(EDGE_DATA_START_SIZE, 0, MEM_WRITE);
     if (!LineSweepMem || !EdgeArenaMem)
     {
@@ -408,39 +423,41 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
     fprintf(stdout, "Pre-edges: %f\n", Trace.Diff);
     StartTiming(&Trace);
     
+    ring_border Border = { DBL_MAX, DBL_MAX, -DBL_MAX, -DBL_MAX, false };
+    ring_border EmptyBorder = Border;
+    //buffer OuterRingArena = Buffer(LineSweepMem, 0, LineSweepMemSize);
+    buffer OuterRingArena = Buffer(GetMemory(Megabyte(10), 0, MEM_WRITE), 0, Megabyte(10));
+    
     u32 FirstIdx = 1;
-    bbox2 BBox = BBox2(DBL_MAX, DBL_MAX, -DBL_MAX, -DBL_MAX);
     line_dir PrevDir = LineDir_Right; // Always begins to the right.
-    WriteVertexPair(Ring, Affine, Info.EdgeList, &Info.SortedEdges[FirstIdx], &BBox);
+    WriteVertexPair(Ring, Affine, Info.EdgeList, &Info.SortedEdges[FirstIdx], &Border);
     
     for (u32 InsertIdx = 3; InsertIdx < Info.EdgeCount; InsertIdx += 2)
     {
-        if (InsertIdx == 4801)
-        {
-            int Z = 0;
-        }
-        
         edge* PrevEdge = &Info.EdgeList[Info.SortedEdges[InsertIdx-1]];
         line_dir NextDir = GetLineDirection(PrevDir, PrevEdge);
         
         u32 NextIdx = (NextDir == LineDir_Down) ? Info.EdgeList[PrevEdge->Below].SortedIdx : Info.EdgeList[PrevEdge->Above].SortedIdx;
         
-        if (NextIdx == FirstIdx)
+        if (NextIdx == FirstIdx) // Marks closure of ring.
         {
-            // Repeat first vertex of ring to close it.
-            Ring->Vertices[Ring->NumVertices++] = Ring->Vertices[0];
+            Ring->Vertices[Ring->NumVertices++] = Ring->Vertices[0]; // Repeats first vertex to close ring.
+            Ring->IsInner = Border.IsInner;
+            Ring->BBox = Border.BBox;
+            Ring->BBoxArea = Area(Border.BBox);
+            
             Poly.NumRings++;
             Poly.NumVertices += Ring->NumVertices;
-            
-            tree_node* Node = (tree_node*)&Ring->Vertices[Ring->NumVertices];
-            Node->BBox = BBox;
-            Node->BBoxArea = (BBox.Max.X - BBox.Min.X) * (BBox.Max.Y - BBox.Min.Y);
-            Node->RingOffset = (usz)Node - (usz)Ring;
-            BBox = BBox2(DBL_MAX, DBL_MAX, -DBL_MAX, -DBL_MAX);
+            Border = EmptyBorder;
+            if (!Ring->IsInner)
+            {
+                u32* RingOffset = PushSize(&OuterRingArena, sizeof(u32), u32);
+                *RingOffset = (usz)Ring - (usz)Poly.Rings;
+            }
             
             // New ring.
-            Ring = (ring_info*)&Node[1];
-            usz RequiredSize = (Info.EdgeCount - InsertIdx + 1) * sizeof(v2) + sizeof(ring_info) + sizeof(tree_node);
+            Ring = (ring_info*)&Ring->Vertices[Ring->NumVertices];
+            usz RequiredSize = (Info.EdgeCount - InsertIdx + 1) * sizeof(v2) + sizeof(ring_info);
             usz RingOffset = (usz)Ring - (usz)Poly.Rings;
             usz RemainingSize = PolyDataSize - RingOffset;
             
@@ -462,7 +479,7 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
                 Ring = (ring_info*)((u8*)Poly.Rings + RingOffset);
             }
             
-            WriteVertexPair(Ring, Affine, Info.EdgeList, &Info.SortedEdges[InsertIdx], &BBox);
+            WriteVertexPair(Ring, Affine, Info.EdgeList, &Info.SortedEdges[InsertIdx], &Border);
             
             FirstIdx = InsertIdx;
             edge* FirstEdge = &Info.EdgeList[Info.SortedEdges[FirstIdx]];
@@ -494,7 +511,7 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
                 NextEdge[0].SortedIdx = InsertIdx;
                 NextEdge[1].SortedIdx = InsertIdx+1;
                 
-                WriteVertexPair(Ring, Affine, Info.EdgeList, Insert, &BBox);
+                WriteVertexPair(Ring, Affine, Info.EdgeList, Insert, &Border);
             }
             else
             {
@@ -520,93 +537,95 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
                     InsertEdge[1].SortedIdx = InsertIdx;
                 }
                 
-                WriteVertexPair(Ring, Affine, Info.EdgeList, Insert, &BBox);
+                WriteVertexPair(Ring, Affine, Info.EdgeList, Insert, &Border);
             }
         }
     }
     
-    Ring->Vertices[Ring->NumVertices++] = Ring->Vertices[0];
+    Ring->Vertices[Ring->NumVertices++] = Ring->Vertices[0]; // Repeats first vertex to close ring.
+    Ring->IsInner = Border.IsInner;
+    Ring->BBox = Border.BBox;
+    Ring->BBoxArea = Area(Border.BBox);
+    
     Poly.NumRings++;
     Poly.NumVertices += Ring->NumVertices;
+    Border = EmptyBorder;
+    if (!Ring->IsInner)
+    {
+        u32* RingOffset = PushSize(&OuterRingArena, sizeof(u32), u32);
+        *RingOffset = (usz)Ring - (usz)Poly.Rings;
+    }
     
     StopTiming(&Trace);
     fprintf(stdout, "Edges: %f\n", Trace.Diff);
     StartTiming(&Trace);
     
-    tree_node* Node = (tree_node*)&Ring->Vertices[Ring->NumVertices];
-    Node->BBoxArea = (BBox.Max.X - BBox.Min.X) * (BBox.Max.Y - BBox.Min.Y);
-    Node->RingOffset = (usz)Node - (usz)Ring;
-    
     // Order polygons by outer/inner.
     
-    tree_node NullNode = { DBL_MAX, 0, 0, 0, 0 };
-    tree_node* FirstNode = (tree_node*)&Poly.Rings->Vertices[Poly.Rings->NumVertices];
-    tree_node* TargetNode = GetNextTreeNode(FirstNode);
-    for (u32 TargetIdx = 1; TargetIdx < Poly.NumRings; TargetIdx++)
+    u32* OuterOffset = (u32*)OuterRingArena.Base;
+    usz OuterRingCount = OuterRingArena.WriteCur / sizeof(u32);
+    ring_info NullRing = {0};
+    NullRing.BBoxArea = DBL_MAX;
+    
+    buffer IntersectArena = Buffer(OuterRingArena.Base + OuterRingArena.WriteCur, 0, OuterRingArena.Size - OuterRingArena.WriteCur);
+    
+    Ring = Poly.Rings;
+    ring_info* OuterRing = Ring;
+    for (u32 Count = 1; Count < Poly.NumRings; Count++)
     {
-        tree_node* OuterNode = &NullNode;
-        tree_node* TestNode = FirstNode;
-        ring_info* TargetRing = GetRingFrom(TargetNode);
-        for (u32 TestIdx = 0; TestIdx < Poly.NumRings; TestIdx++)
+        Ring = GetNextRing(Ring);
+        if (!Ring->IsInner)
         {
-            if (TestNode != TargetNode
-                && Intersects(TargetNode->BBox, TestNode->BBox)
-                && IsRingInsideRing(TargetRing, GetRingFrom(TestNode))
-                && TestNode->BBoxArea < OuterNode->BBoxArea)
-            {
-                TargetRing->Type++;
-                OuterNode = TestNode;
-            }
-            TestNode = GetNextTreeNode(TestNode);
+            OuterRing->Next = Ring;
+            OuterRing = Ring;
         }
-        
-        TargetRing->Type &= 0x1; // Forces type to be 0 or 1.
-        if (OuterNode != &NullNode)
+        else
         {
-            TargetNode->Parent = OuterNode;
-            if (!OuterNode->Child)
+            ring_info* SmallestOuterRing = &NullRing;
+            for (u32 OuterIdx = 0; OuterIdx < OuterRingCount; OuterIdx++)
             {
-                OuterNode->Child = TargetNode;
+                ring_info* TestRing = (ring_info*)((u8*)Poly.Rings + OuterOffset[OuterIdx]);
+                if (Intersects(TestRing->BBox, Ring->BBox))
+                {
+                    u32* RingOffset = PushSize(&IntersectArena, sizeof(u32), u32);
+                    *RingOffset = OuterOffset[OuterIdx];
+                }
+            }
+            
+            u32* IntersectOffset = (u32*)IntersectArena.Base;
+            usz IntersectCount = IntersectArena.WriteCur / sizeof(u32);
+            if (IntersectCount == 1)
+            {
+                SmallestOuterRing = (ring_info*)((u8*)Poly.Rings + IntersectOffset[0]);
             }
             else
             {
-                tree_node* ChildNode = OuterNode->Child;
-                while (ChildNode->Sibling)
+                for (u32 IntersectIdx = 0; IntersectIdx < IntersectCount; IntersectIdx++)
                 {
-                    ChildNode = ChildNode->Sibling;
+                    ring_info* TestRing = (ring_info*)((u8*)Poly.Rings + IntersectOffset[IntersectIdx]);
+                    if (IsRingInsideRing(Ring, TestRing)
+                        && TestRing->BBoxArea < SmallestOuterRing->BBoxArea)
+                    {
+                        SmallestOuterRing = TestRing;
+                    }
                 }
-                ChildNode->Sibling = TargetNode;
             }
-        }
-        
-        TargetNode = GetNextTreeNode(TargetNode);
-    }
-    
-    StopTiming(&Trace);
-    fprintf(stdout, "Node tree: %f\n", Trace.Diff);
-    StartTiming(&Trace);
-    
-    ring_info NullRing = {0};
-    ring_info* PrevRing = &NullRing;
-    Node = FirstNode;
-    for (u32 NodeIdx = 0; NodeIdx < Poly.NumRings; NodeIdx++)
-    {
-        ring_info* Ring = GetRingFrom(Node);
-        if (Ring->Type  == 0)
-        {
-            PrevRing = PrevRing->Next = Ring;
-            if (Node->Child)
+            IntersectArena.WriteCur = 0;
+            
+            if (!SmallestOuterRing->Child)
             {
-                tree_node* ChildNode = Node->Child;
-                do
+                SmallestOuterRing->Child = Ring;
+            }
+            else
+            {
+                ring_info* ChildRing = SmallestOuterRing->Child;
+                while (ChildRing->Next)
                 {
-                    ring_info* ChildRing = GetRingFrom(ChildNode);
-                    PrevRing = PrevRing->Next = ChildRing;
-                    ChildNode= ChildNode->Sibling;
-                } while (ChildNode);
+                    ChildRing = ChildRing->Next;
+                }
+                ChildRing->Next = Ring;
             }
         }
-        Node = GetNextTreeNode(Node);
     }
     
     StopTiming(&Trace);

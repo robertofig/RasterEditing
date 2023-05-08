@@ -27,8 +27,6 @@
 #include "gdal.h"
 #include "geotypes-base.h"
 
-#define BBOX_BUFFER_SIZE (sizeof(ring_info) + sizeof(v2) * 5)
-
 enum test_type
 {
     TestType_EqualAll,      // Pixel == target value A (All bands).
@@ -45,9 +43,13 @@ enum test_type
 
 struct ring_info
 {
-    ring_info* Next;
+    bbox2 BBox;
+    f64 BBoxArea;
     
-    u32 Type; // 0: Outer, 1: Inner
+    ring_info* Next;
+    ring_info* Child;
+    
+    bool IsInner;
     u32 NumVertices; // Number of vertices in this ring alone.
     v2 Vertices[0];
 };

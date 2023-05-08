@@ -4,13 +4,20 @@
 
 enum edge_type
 {
-    EdgeType_None,
-    EdgeType_TopLeft,
-    EdgeType_TopRight,
-    EdgeType_BottomLeft,
-    EdgeType_BottomRight,
-    EdgeType_TopLeftBottomRight,
-    EdgeType_TopRightBottomLeft
+    EdgeType_None = 0,
+    
+    EdgeType_TopLeft = 1,
+    EdgeType_TopRight = 2,
+    EdgeType_BottomLeft = 3,
+    EdgeType_BottomRight = 4,
+    
+    EdgeType_TopLeftInv = 0x11,
+    EdgeType_TopRightInv = 0x12,
+    EdgeType_BottomLeftInv = 0x13,
+    EdgeType_BottomRightInv = 0x14,
+    
+    EdgeType_TopLeftBottomRight = 0x20,
+    EdgeType_TopRightBottomLeft = 0x21
 };
 
 typedef edge_type (*test_block)(u8*, u8*, u32, u32, double, double);
@@ -33,16 +40,16 @@ GetBlockEdges(bool TLValue, bool TRValue, bool BLValue, bool BRValue)
     }
     if (ValueCount == 3)
     {
-        if (!TLValue) return EdgeType_TopLeft;
-        if (!TRValue) return EdgeType_TopRight;
-        if (!BLValue) return EdgeType_BottomLeft;
-        if (!BRValue) return EdgeType_BottomRight;
+        if (!TLValue) return EdgeType_TopLeftInv;
+        if (!TRValue) return EdgeType_TopRightInv;
+        if (!BLValue) return EdgeType_BottomLeftInv;
+        if (!BRValue) return EdgeType_BottomRightInv;
     }
     return EdgeType_None;
 }
 
 //================================
-// Test for equal all
+// Test for equal (all)
 //================================
 
 #define TEST_FOR_EQUAL_ALL \
@@ -109,7 +116,7 @@ TestF64EqualAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, do
 }
 
 //================================
-// Test for equal any
+// Test for equal (any)
 //================================
 
 #define TEST_FOR_EQUAL_ANY \
@@ -176,7 +183,7 @@ TestF64EqualAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, do
 }
 
 //================================
-// Test for not equal all
+// Test for not equal (all)
 //================================
 
 #define TEST_FOR_NOTEQUAL_ALL \
@@ -243,7 +250,7 @@ TestF64NotEqualAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount,
 }
 
 //================================
-// Test for not equal
+// Test for not equal (any)
 //================================
 
 #define TEST_FOR_NOTEQUAL_ANY \
@@ -310,7 +317,7 @@ TestF64NotEqualAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount,
 }
 
 //================================
-// Test for more than all
+// Test for more than (all)
 //================================
 
 #define TEST_FOR_MORETHAN_ALL \
@@ -377,7 +384,7 @@ TestF64MoreThanAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount,
 }
 
 //================================
-// Test for more than any
+// Test for more than (any)
 //================================
 
 #define TEST_FOR_MORETHAN_ANY \
@@ -444,7 +451,7 @@ TestF64MoreThanAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount,
 }
 
 //================================
-// Test for less than all
+// Test for less than (all)
 //================================
 
 #define TEST_FOR_LESSTHAN_ALL \
@@ -511,7 +518,7 @@ TestF64LessThanAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount,
 }
 
 //================================
-// Test for less than any
+// Test for less than (any)
 //================================
 
 #define TEST_FOR_LESSTHAN_ANY \
@@ -578,7 +585,7 @@ TestF64LessThanAny(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount,
 }
 
 //================================
-// Test for between all
+// Test for between (all)
 //================================
 
 #define TEST_FOR_BETWEEN_ALL \
@@ -650,7 +657,7 @@ TestF64BetweenAll(u8* _TopRow, u8* _BottomRow, u32 InspectWidth, u32 BandCount, 
 }
 
 //================================
-// Test for between any
+// Test for between (any)
 //================================
 
 #define TEST_FOR_BETWEEN_ANY \

@@ -10,6 +10,8 @@
 " Example 2: raster-outline.exe image.tif --bbox\n" \
 " Output: Shapefile with a single multipolygon feature, created at the same path as image.\n"
 
+#define BBOX_BUFFER_SIZE (sizeof(ring_info) + sizeof(v2) * 5)
+
 int main(int Argc, char** Argv)
 {
     if (Argc < 2 || Argc > 3)
@@ -71,12 +73,13 @@ int main(int Argc, char** Argv)
     shapefile Out = CreatePolygon(OutShp, OutShx, OutDbf);
     shp_feature Feat = AddFeature(&Out, Poly.NumRings, Poly.NumVertices);
     
-    ring_info* Ring = Poly.Rings;
-    for (u32 RingIdx = 0; RingIdx < Poly.NumRings; RingIdx++)
+    for (ring_info* Ring = Poly.Rings; Ring; Ring = Ring->Next)
     {
-        shp_ring_type Type = (Ring->Type == 0) ? ShpRing_Outer : ShpRing_Inner;
-        AddRing(&Feat, Type, Ring->NumVertices, Ring->Vertices, 0, 0, sizeof(v2));
-        Ring = Ring->Next;
+        AddRing(&Feat, ShpRing_Outer, Ring->NumVertices, Ring->Vertices, 0, 0, sizeof(v2));
+        for (ring_info* ChildRing = Ring->Child; ChildRing; ChildRing = ChildRing->Next)
+        {
+            AddRing(&Feat, ShpRing_Inner, ChildRing->NumVertices, ChildRing->Vertices, 0, 0, sizeof(v2));
+        }
     }
     
     // Write shapefile to disk.
