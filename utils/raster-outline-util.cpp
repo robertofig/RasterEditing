@@ -3,11 +3,13 @@
 
 #define USAGE_CODE "Usage: raster-outline.exe [input_raster] [value] [bands]\n" \
 "    > input_raster: Path to raster from which to extract the outline.\n" \
-"    > value: Pixel value of the outline. Alternatively 'nodata' to outline valid pixels, " \
-"or 'bbox' to outline the border of the raster.\n" \
-"    > bands: Bands to investigate the value in. Must be comma-separated, ex: 2,4,5,8.\n" \
+"    > value: Pixel value of the outline. Alternatively 'nodata' to outline valid" \
+"pixels, or 'bbox' to outline the border of the raster.\n" \
+"    > bands: Bands to investigate the value in. Must be comma-separated, ex: " \
+"2,4,5,8.\n" \
 "Example: raster-outline.exe path/to/raster/image.ecw 255 1,2,3\n" \
-"Output: Shapefile with a single multipolygon feature, created at the same path as image.\n"
+"Output: Shapefile with a single multipolygon feature, created at the same path as" \
+"image.\n"
 
 int main(int Argc, char** Argv)
 {
@@ -31,7 +33,14 @@ int main(int Argc, char** Argv)
     poly_info Poly = {0};
     
     string BandList = String(Argv[3], strlen(Argv[3]), 0, EC_ASCII);
-    int* Bands = (int*)GetMemoryFromHeap((BandList.Size/2 + 1) * sizeof(int));
+    buffer BandsMem = GetMemoryFromHeap((BandList.Size/2 + 1) * sizeof(int));
+    if (!BandsMem.Base)
+    {
+        fprintf(stderr, "Error: Not enough memory.\n");
+        return -1;
+    }
+    int* Bands = (int*)BandsMem.Base;
+    
     int BandCount = 0;
     for (usz Idx = 0
          ; (Idx = CharInString(',', BandList, RETURN_IDX_FIND)) != INVALID_IDX
@@ -49,7 +58,9 @@ int main(int Argc, char** Argv)
         int RasterHasNoData = 0;
         double Value = GDALGetRasterNoDataValue(Band, &RasterHasNoData);
         
-        Poly = (RasterHasNoData) ? RasterToOutline(DS, Value, 0, TestType_NotEqual, BandCount, Bands) : BBoxOutline(DS, BBoxBuffer);
+        Poly = ((RasterHasNoData)
+                ? RasterToOutline(DS, Value, 0, TestType_NotEqual, BandCount, Bands)
+                : BBoxOutline(DS, BBoxBuffer));
     }
     else if (!memcmp(Argv[2], "bbox", 4))
     {
@@ -65,7 +76,14 @@ int main(int Argc, char** Argv)
     GDALClose(DS);
     
     usz OutFullSize = (sizeof(i32) * Poly.NumRings) + (sizeof(v2) * Poly.NumVertices) + 152 + 108 + 35;
-    u8* OutShp = (u8*)GetMemory(OutFullSize, 0, MEM_READ|MEM_WRITE);
+    buffer OutShapefile = GetMemory(OutFullSize, 0, MEM_WRITE);
+    if (OutShapefile.Base)
+    {
+        fprintf(stderr, "Error: Not enough memory.\n");
+        return -1;
+    }
+    
+    u8* OutShp = (u8*)OutShapefile.Base;
     u8* OutDbf = OutShp + OutFullSize - 35;
     u8* OutShx = OutDbf - 108;
     
@@ -85,15 +103,15 @@ int main(int Argc, char** Argv)
     AppendStringToPath(String(Argv[1], strlen(Argv[1]), 0, EC_ASCII), &OutPath);
     
     usz InsertIdx = OutPath.WriteCur = CharInString('.', OutPath, RETURN_IDX_AFTER|SEARCH_REVERSE);
-    AppendStringToString(StrLit("shp"), &OutPath);
+    AppendStringToString(StringLit("shp"), &OutPath);
     file Shp = CreateNewFile(OutPath.Base, WRITE_SOLO|FORCE_CREATE);
     
     OutPath.WriteCur = InsertIdx;
-    AppendStringToString(StrLit("shx"), &OutPath);
+    AppendStringToString(StringLit("shx"), &OutPath);
     file Shx = CreateNewFile(OutPath.Base, WRITE_SOLO|FORCE_CREATE);
     
     OutPath.WriteCur = InsertIdx;
-    AppendStringToString(StrLit("dbf"), &OutPath);
+    AppendStringToString(StringLit("dbf"), &OutPath);
     file Dbf = CreateNewFile(OutPath.Base, WRITE_SOLO|FORCE_CREATE);
     
     WriteEntireFile(Shp, Buffer(Out.ShpFilePtr, Out.ShpFileSize, 0));

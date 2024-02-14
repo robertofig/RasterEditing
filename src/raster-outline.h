@@ -61,7 +61,8 @@ struct poly_info
     ring_info* Rings;
 };
 
-external poly_info RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestType, int BandCount, int* BandIdx);
+external poly_info RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB,
+                                   test_type TestType, int BandCount, int* BandIdx);
 
 /* Creates outline in raster [DS] around pixels that match the [TestType]
  |  condition of a pixel value. For test types of Equal, NotEqual, BiggerThan,

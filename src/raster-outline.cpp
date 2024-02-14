@@ -29,6 +29,7 @@ enum line_dir
 
 struct edge_info
 {
+    buffer LineSweep;
     u8* FirstLine;
     u8* SecondLine;
     u32* ColHashTable;
@@ -45,10 +46,13 @@ struct edge_info
     edge* EdgeList;
     u32* SortedEdges;
     
+    buffer PolyRings;
+    
     ~edge_info()
     {
-        FreeMemory(FirstLine);
-        FreeMemory(EdgeArena.Base);
+        FreeMemory(&LineSweep);
+        FreeMemory(&EdgeArena);
+        FreeMemory(&PolyRings);
     }
 };
 
@@ -168,17 +172,16 @@ ProcessSweepLine(edge_info* Info, int Row)
             if (Arena->Size < RequiredSize)
             {
                 usz NewAllocSize = Max(Arena->Size * 2, RequiredSize);
-                u8* NewAlloc = (u8*)GetMemory(NewAllocSize, 0, MEM_WRITE);
-                if (!NewAlloc)
+                buffer NewAlloc = GetMemory(NewAllocSize, 0, MEM_WRITE);
+                if (!NewAlloc.Base)
                 {
                     return false;
                 }
-                CopyData(NewAlloc, Arena->WriteCur, Arena->Base, Arena->WriteCur);
-                FreeMemory(Arena->Base);
+                CopyData(NewAlloc.Base, NewAlloc.Size, Arena->Base, Arena->WriteCur);
+                FreeMemory(Arena);
                 
-                Arena->Base = NewAlloc;
-                Arena->Size = Align(NewAllocSize, gSysInfo.PageSize);
-                Info->EdgeList = (edge*)NewAlloc;
+                *Arena = NewAlloc;
+                Info->EdgeList = (edge*)NewAlloc.Base;
             }
             
             if (Type == EdgeType_TopLeftBottomRight)
@@ -321,18 +324,21 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
     int Height = GDALGetRasterYSize(DS);
     int Bands = GDALGetRasterCount(DS);
     
-    int InspectWidth = Width + 2; // One extra pixel on the left and right, to guard from overflow.
-    int InspectHeight = Height + 2; // One extra row on top and bottom, to guard from overflow.
+    // Extra pixels on left, right, top and bottom, to guard from overflow.
+    int InspectWidth = Width + 2;
+    int InspectHeight = Height + 2;
     usz DTypeSize = GetDTypeSize(DType);
     
     double Affine[6];
     GDALGetGeoTransform(DS, Affine);
     
     int RasterHasNoData = 0;
-    double NoData = GDALGetRasterNoDataValue(Band, &RasterHasNoData); // TODO: Check if DType isn't i64 or u64.
+    double NoData = GDALGetRasterNoDataValue(Band, &RasterHasNoData);
+    // TODO: Check if DType isn't i64 or u64.
     if (!RasterHasNoData)
     {
-        // TODO: What if border value is 0, 1 or 2? Then this won't work. Think of something better.
+        // TODO: What if border value is 0, 1 or 2? Then this won't work.
+        //       Think of something better.
         NoData = (ValueA != 0) ? 0 : (ValueB != 1) ? 1 : 2;
     }
     
@@ -340,16 +346,18 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
     
     u32 ColHashTableSize = Width * sizeof(u32);
     u32 LineSweepSize = InspectWidth * DTypeSize;
-    void* LineSweepMem = GetMemory(LineSweepSize*2*BandCount + ColHashTableSize, 0, MEM_WRITE);
-    void* EdgeArenaMem = GetMemory(EDGE_DATA_START_SIZE, 0, MEM_WRITE);
-    if (!LineSweepMem || !EdgeArenaMem)
+    buffer LineSweep = GetMemory(LineSweepSize*2*BandCount + ColHashTableSize,
+                                 0, MEM_WRITE);
+    buffer EdgeArena = GetMemory(EDGE_DATA_START_SIZE, 0, MEM_WRITE);
+    if (!LineSweep.Base || !EdgeArena.Base)
     {
         return EmptyPoly;
     }
     u32 AllBandsLineSize = LineSweepSize * BandCount;
     
     edge_info Info = {0};
-    Info.FirstLine = (u8*)LineSweepMem;
+    Info.LineSweep = LineSweep;
+    Info.FirstLine = LineSweep.Base;
     Info.SecondLine = Info.FirstLine + AllBandsLineSize;
     Info.ColHashTable = (u32*)(Info.SecondLine + AllBandsLineSize);
     Info.InspectWidth = InspectWidth;
@@ -358,8 +366,8 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
     Info.ValueA = ValueA;
     Info.ValueB = ValueB;
     Info.DTypeSize = DTypeSize;
-    Info.EdgeArena = Buffer(EdgeArenaMem, 0, Align(EDGE_DATA_START_SIZE, gSysInfo.PageSize));
-    Info.EdgeList = PushStruct(&Info.EdgeArena, edge); // Inits list with zeroed stub struct [idx 0].
+    Info.EdgeArena = EdgeArena;;
+    Info.EdgeList = PushStruct(&Info.EdgeArena, edge); // Inits list with stub struct [idx 0].
     Info.EdgeCount++;
     
     // Get edges line by line.
@@ -390,11 +398,15 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
         Info.EdgeList[EdgeIdx].SortedIdx = EdgeIdx;
     }
     
-    usz PolyDataSize = Align(RING_DATA_START_SIZE + (Info.EdgeCount * sizeof(v2)), gSysInfo.PageSize);
-    if ((Poly.Rings = (ring_info*)GetMemory(PolyDataSize, 0, MEM_WRITE)) == NULL)
+    usz PolyDataSize = Align(RING_DATA_START_SIZE + (Info.EdgeCount * sizeof(v2)),
+                             gSysInfo.PageSize);
+    buffer PolyRings = GetMemory(PolyDataSize, 0, MEM_WRITE);
+    if (!PolyRings.Base)
     {
         return EmptyPoly;
     }
+    Info.PolyRings = PolyRings;
+    Poly.Rings = (ring_info*)PolyRings.Base;
     ring_info* Ring = Poly.Rings;
     
     u32 FirstIdx = 1;
@@ -437,15 +449,15 @@ RasterToOutline(GDALDatasetH DS, double ValueA, double ValueB, test_type TestTyp
                 // Not supposed to reach here often. Only if raster has a lot of rings.
                 
                 usz NewPolyDataSize = PolyDataSize + gSysInfo.PageSize;
-                void* NewPolyData = GetMemory(NewPolyDataSize, 0, MEM_WRITE);
-                if (!NewPolyData)
+                buffer NewPolyData = GetMemory(NewPolyDataSize, 0, MEM_WRITE);
+                if (!NewPolyData.Base)
                 {
-                    FreeMemory(Poly.Rings);
                     return EmptyPoly;
                 }
-                CopyData(NewPolyData, NewPolyDataSize, Poly.Rings, PolyDataSize);
-                FreeMemory(Poly.Rings);
-                Poly.Rings = (ring_info*)NewPolyData;
+                CopyData(NewPolyData.Base, NewPolyData.Size, Poly.Rings, PolyDataSize);
+                FreeMemory(&Info.PolyRings);
+                Info.PolyRings = NewPolyData;
+                Poly.Rings = (ring_info*)NewPolyData.Base;
                 PolyDataSize = NewPolyDataSize;
                 Ring = (ring_info*)((u8*)Poly.Rings + RingOffset);
             }
@@ -614,13 +626,4 @@ BBoxOutline(GDALDatasetH DS, u8* BBoxBuffer)
     Poly.Rings->Vertices[3] = V2(Affine[0], Affine[3] + (Height * Affine[5]));
     
     return Poly;
-}
-
-external void
-FreePolyInfo(poly_info Poly)
-{
-    if (Poly.Rings)
-    {
-        FreeMemory(Poly.Rings);
-    }
 }

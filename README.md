@@ -46,7 +46,9 @@ This library currently builds on top of [TinyBase](https://github.com/robertofig
 
 ## Utilities
 
-Some test utilities that showcase some usage of the tools are present in the [Utils](https://github.com/robertofig/RasterTools/utils) folder. To build them, open the build script and set the variables `GDALInc`, `TinyBaseInc` and `GeoTypesInc` to the path with the header files of these libraries, and `GDALLib` to the path with the import library for linking GDAL.
+Some test utilities that showcase some usage of the tools are present in the [Utils](https://github.com/robertofig/RasterTools/utils) folder. To build them, open the build script and set the variables `GDALInc` and `GDALLib` to the paths with the header files and import library for linking GDAL.
+
+This code also makes use of the TinyBase and GeoTypes libraries, which included in this repository as submodules. To pull the, go into the `include/` folder and call `git submodule init`, followed by `git submodule update`.
 
 ## License
 
