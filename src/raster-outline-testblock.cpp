@@ -9,8 +9,7 @@ enum edge_type
     EdgeType_TopRight,
     EdgeType_BottomLeft,
     EdgeType_BottomRight,
-    EdgeType_TopLeftBottomRight,
-    EdgeType_TopRightBottomLeft
+    EdgeType_Cross,
 };
 
 typedef edge_type (*test_block)(u8*, u8*, u32, u32, double, double);
@@ -26,12 +25,11 @@ GetBlockEdges(bool TLValue, bool TRValue, bool BLValue, bool BRValue)
         if (BLValue) return EdgeType_BottomLeft;
         if (BRValue) return EdgeType_BottomRight;
     }
-    if (ValueCount == 2)
+    else if (ValueCount == 2)
     {
-        if (TLValue && BRValue) return EdgeType_TopLeftBottomRight;
-        if (TRValue && BLValue) return EdgeType_TopRightBottomLeft;
+        if ((TLValue + BRValue) != 1) return EdgeType_Cross;
     }
-    if (ValueCount == 3)
+    else if (ValueCount == 3)
     {
         if (!TLValue) return EdgeType_TopLeft;
         if (!TRValue) return EdgeType_TopRight;
