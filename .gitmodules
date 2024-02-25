@@ -1,6 +1,0 @@
-[submodule "include/TinyBase"]
-	path = include/TinyBase
-	url = https://www.github.com/robertofig/TinyBase.git
-[submodule "include/GeoTypes"]
-	path = include/GeoTypes
-	url = https://www.github.com/robertofig/GeoTypes.git

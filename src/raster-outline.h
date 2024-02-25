@@ -40,11 +40,10 @@ enum test_type
     TestType_Equal,           // Pixel == ValueA
     TestType_NotEqual,        // Pixel != ValueA
     TestType_BiggerThan,      // Pixel >  ValueA
-    TestType_LessThan,        // Pixel <  ValueA
     TestType_BiggerOrEqualTo, // Pixel >= ValueA
+    TestType_LessThan,        // Pixel <  ValueA
     TestType_LessOrEqualTo,   // Pixel <= ValueA
-    TestType_Between,         // ValueA >= Pixel <= ValueB
-    TestType_NotBetween       // Pixel < ValueA OR Pixel > ValueB
+    TestType_Between          // ValueA >= Pixel <= ValueB
 };
 
 struct ring_info

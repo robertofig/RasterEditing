@@ -12,7 +12,8 @@
 #include "gdal.h"
 #include "geotypes-base.h"
 
-external GDALDatasetH RasterCut(char* DstRaster, char** SrcRasterList, int NumSrcRasters, v2* CutPolygon, int NumPoints);
+external GDALDatasetH RasterCut(char* DstRaster, char** SrcRasterList, int NumSrcRasters,
+                                v2* CutPolygon, int NumPoints);
 
 /* Creates output polygon given a [SrcRasterList] and a [CutPolygon]. The number
 |  of rasters in the list and number of vertices in the polygon are passed in

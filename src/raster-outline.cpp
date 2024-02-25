@@ -66,6 +66,8 @@ struct tree_node
     tree_node* Child;
 };
 
+#define RING_SIZE (sizeof(ring_info) + sizeof(tree_node))
+
 //================================
 // Functions
 //================================
@@ -84,6 +86,61 @@ GetDTypeSize(GDALDataType DType)
         case GDT_Float64: return 8;
         default:          return 0;
     }
+}
+
+internal f64
+GetBleedValue(f64 ValueA, f64 ValueB, test_type TestType, GDALDataType DType)
+{
+    f64 Result = INF64;
+    
+    f64 MinValue, MaxValue;
+    if (DType == GDT_Byte)
+    { MinValue = (f64)(u8)U8_MIN; MaxValue = (f64)(u8)U8_MAX; }
+    else if (DType == GDT_UInt16)
+    { MinValue = (f64)(u16)U16_MIN; MaxValue = (f64)(u16)U16_MAX; }
+    else if (DType == GDT_Int16)
+    { MinValue = (f64)(i16)I16_MIN; MaxValue = (f64)(i16)I16_MAX; }
+    else if (DType == GDT_UInt32)
+    { MinValue = (f64)(u32)U32_MIN; MaxValue = (f64)(u32)U32_MAX; }
+    else if (DType == GDT_Int32)
+    { MinValue = (f64)(i32)I32_MIN; MaxValue = (f64)(i32)I32_MAX; }
+    else if (DType == GDT_Float32)
+    { MinValue = (f64)(f32)F32_MIN; MaxValue = (f64)(f32)F32_MAX; }
+    else if (DType == GDT_Float64)
+    { MinValue = F64_MIN; MaxValue = F64_MAX; }
+    
+    switch (TestType)
+    {
+        case TestType_Equal:
+        {
+            Result = ValueA + 1;
+        } break;
+        
+        case TestType_NotEqual:
+        case TestType_BiggerThan:
+        case TestType_LessThan:
+        {
+            Result = ValueA;
+        } break;
+        
+        case TestType_BiggerOrEqualTo:
+        {
+            if (ValueA > MinValue) Result = MinValue;
+        } break;
+        
+        case TestType_LessOrEqualTo:
+        {
+            if (ValueA < MaxValue) Result = MaxValue;
+        } break;
+        
+        case TestType_Between:
+        {
+            if (ValueA > MinValue) Result = MinValue;
+            else if (ValueB < MaxValue) Result = MaxValue;
+        } break;
+    }
+    
+    return Result;
 }
 
 internal void
@@ -275,10 +332,14 @@ IsRingInsideRing(ring_info* A, ring_info* B)
 {
     if (A != B)
     {
-        v2 Test = (A->Vertices[0].X < A->Vertices[1].X) ? A->Vertices[0] : (A->Vertices[1].X < A->Vertices[2].X) ? A->Vertices[1] : A->Vertices[2];
+        v2 Test = ((A->Vertices[0].X < A->Vertices[1].X) ? A->Vertices[0]
+                   : ((A->Vertices[1].X < A->Vertices[2].X) ? A->Vertices[1]
+                      : A->Vertices[2]));
         usz RayCount = 0;
         
-        // BP1-BP2 is the test line, BP0-BP1 is the line before and BP2-BP3 is the line after.
+        // BP1-BP2 is the test line, BP0-BP1 is the line before and BP2-BP3 is the
+        // line after.
+        
         v2 BP0 = B->Vertices[B->NumVertices-2];
         v2 BP1 = B->Vertices[0];
         v2 BP2 = B->Vertices[1];
@@ -298,75 +359,6 @@ IsRingInsideRing(ring_info* A, ring_info* B)
     }
     
     return false;
-}
-
-internal f64
-GetBleedValue(f64 ValueA, f64 ValueB, test_type TestType, GDALDataType DType)
-{
-    f64 Result = INF64;
-    
-    f64 MinValue, MaxValue;
-    if (DType == GDT_Byte) { MinValue = U8_MIN; MaxValue = U8_MAX; }
-    else if (DType == GDT_UInt16) { MinValue = U16_MIN; MaxValue = U16_MAX; }
-    else if (DType == GDT_Int16) { MinValue = I16_MIN; MaxValue = I16_MAX; }
-    else if (DType == GDT_UInt32) { MinValue = U32_MIN; MaxValue = U32_MAX; }
-    else if (DType == GDT_Int32) { MinValue = I32_MIN; MaxValue = I32_MAX; }
-    else if (DType == GDT_Float32) { MinValue = F32_MIN; MaxValue = F32_MAX; }
-    else if (DType == GDT_Float64) { MinValue = F64_MIN; MaxValue = F64_MAX; }
-    
-    switch (TestType)
-    {
-        case TestType_Equal:
-        {
-            Result = ValueA + 1;
-        } break;
-        
-        case TestType_NotEqual:
-        case TestType_BiggerThan:
-        case TestType_LessThan:
-        case TestType_NotBetween:
-        {
-            Result = ValueA;
-        } break;
-        
-        case TestType_BiggerOrEqualTo:
-        {
-            if (ValueA > MinValue)
-            {
-                union { f64 F; u64 I; } _ValueA = { ValueA };
-                _ValueA.I--;
-                Result = _ValueA.F;
-            }
-        } break;
-        
-        case TestType_LessOrEqualTo:
-        {
-            if (ValueA < MaxValue)
-            {
-                union { f64 F; u64 I; } _ValueA = { ValueA };
-                _ValueA.I++;
-                Result = _ValueA.F;
-            }
-        } break;
-        
-        case TestType_Between:
-        {
-            if (ValueA > MinValue)
-            {
-                union { f64 F; u64 I; } _ValueA = { ValueA };
-                _ValueA.I--;
-                Result = _ValueA.F;
-            }
-            else if (ValueB < MaxValue)
-            {
-                union { f64 F; u64 I; } _ValueB = { ValueB };
-                _ValueB.I++;
-                Result = _ValueB.F;
-            }
-        } break;
-    }
-    
-    return Result;
 }
 
 external poly_info
@@ -476,9 +468,7 @@ RasterToOutline(GDALDatasetH DS, f64 ValueA, f64 ValueB, test_type TestType,
     while (FirstEdge < EndOfEdgeList)
     {
         usz NumVerticesLeft = Info.VertexCount - Poly.NumVertices;
-        usz RequiredRingSize = (sizeof(ring_info)
-                                + (NumVerticesLeft * sizeof(v2))
-                                + sizeof(tree_node));
+        usz RequiredRingSize = RING_SIZE + (NumVerticesLeft * sizeof(v2));
         if (RequiredRingSize > (PolyRings.Size - PolyRings.WriteCur))
         {
             RingDataSize += RING_DATA_START_SIZE;
@@ -664,8 +654,20 @@ BBoxOutline(GDALDatasetH DS, u8* BBoxBuffer)
     Poly.Rings->NumVertices = 5;
     Poly.Rings->Vertices[0] = Poly.Rings->Vertices[4] = V2(Affine[0], Affine[3]);
     Poly.Rings->Vertices[1] = V2(Affine[0] + (Width * Affine[1]), Affine[3]);
-    Poly.Rings->Vertices[2] = V2(Affine[0] + (Width * Affine[1]), Affine[3] + (Height * Affine[5]));
+    Poly.Rings->Vertices[2] = V2(Affine[0] + (Width * Affine[1]),
+                                 Affine[3] + (Height * Affine[5]));
     Poly.Rings->Vertices[3] = V2(Affine[0], Affine[3] + (Height * Affine[5]));
     
     return Poly;
+}
+
+external void
+FreePolyInfo(poly_info Poly)
+{
+    usz GeomSize = sizeof(v2) * Poly.NumVertices;
+    buffer Rings = { (u8*)Poly.Rings, GeomSize, GeomSize };
+    Rings.WriteCur += RING_SIZE * Poly.NumRings;
+    Rings.Size += Align(RING_SIZE * Poly.NumRings, RING_DATA_START_SIZE);
+    FreeMemory(&Rings);
+    
 }

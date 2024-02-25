@@ -7,7 +7,7 @@ It provides functionalities that are either not commonly found on GIS programs, 
 The tools currently included are:
 
 * [raster-outline.h](src/raster-outline.h): Creates polygonal outlines around groups of pixels in an image.
-* [raster-cur.h](src/raster-cut.h): Mosaics and cuts several rasters into a single image given a cut polygon.
+* [raster-cut.h](src/raster-cut.h): Mosaics and cuts several rasters into a single image given a cut polygon.
 
 #### 1) Raster Outline
 The raster outline tool takes a target pixel value and a source raster, and outputs a list of polygons around groups of pixels that correspond to the target value in some way, such as being larger than the target value, or different from it.
@@ -42,13 +42,13 @@ Alternatively, one can build these into objects or static library, in which case
 
 ## Dependencies
 
-This library currently builds on top of [TinyBase](https://github.com/robertofig/TinyBase) and [GeoTypes](https://github.com/robertofig/GeoTypes) for basic memory operations and geometric manipulation. It also requires [GDAL](https://github.com/OSGeo/gdal) for opening and reading raster files (version 2.1 or above).
+This library currently builds on top of [GDAL](https://github.com/OSGeo/gdal) for opening and reading raster files (version 2.1 or above). 
 
 ## Utilities
 
-Some test utilities that showcase some usage of the tools are present in the [Utils](https://github.com/robertofig/RasterTools/utils) folder. To build them, open the build script and set the variables `GDALInc` and `GDALLib` to the paths with the header files and import library for linking GDAL.
+Some test utilities that showcase some usage of the tools are present in the [Utils](https://github.com/robertofig/RasterTools/utils) folder. The build them, run the script located in `/src`, the executable will be saved to a `/build` directory in the project root. Choose the build script according to your compiler and platform. It can be simply run from command line, provided the compiler symbols are loaded.
 
-This code also makes use of the TinyBase and GeoTypes libraries, which included in this repository as submodules. To pull the, go into the `include/` folder and call `git submodule init`, followed by `git submodule update`.
+On Windows, first set the variables `GDALInc` and `GDALLib` in the build script to the paths with the header files and import library before running it.
 
 ## License
 

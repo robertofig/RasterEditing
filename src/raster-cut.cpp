@@ -61,8 +61,8 @@ LoadRastersFromList(char** SrcRasterList, int NumSrcRasters)
         time_t Now = time(0);
         sprintf(Src.VSIName, "/vsimem/%d.vrt", (int)Now);
         int Error = 0;
-        Src.DS = GDALBuildVRT(Src.VSIName, NumSrcRasters, NULL, SrcRasterList, Options, &Error);
-        
+        Src.DS = GDALBuildVRT(Src.VSIName, NumSrcRasters, NULL, SrcRasterList,
+                              Options, &Error);
         GDALBuildVRTOptionsFree(Options);
     }
     else
@@ -85,7 +85,8 @@ LoadRastersFromList(char** SrcRasterList, int NumSrcRasters)
 }
 
 external GDALDatasetH
-RasterCut(char* DstRaster, char** SrcRasterList, int NumSrcRasters, v2* CutPolygon, int NumPoints)
+RasterCut(char* DstRaster, char** SrcRasterList, int NumSrcRasters, v2* CutPolygon,
+          int NumPoints)
 {
     GDALDatasetH DstDS = 0;
     
@@ -121,8 +122,10 @@ RasterCut(char* DstRaster, char** SrcRasterList, int NumSrcRasters, v2* CutPolyg
     double MinX = Src.Affine[0] + (LeftPixel * Src.Affine[1]);
     double MaxY = Src.Affine[3] + (TopPixel * Src.Affine[5]);
     
-    double DstAffine[6] = { MinX, Src.Affine[1], Src.Affine[2], MaxY, Src.Affine[4], Src.Affine[5] };
-    OGRGeometryH PLGeom = XYGeomToPLGeom(CutPolygon, NumPoints, Src.Affine, Src.XSize, Src.YSize);
+    double DstAffine[6] = { MinX, Src.Affine[1], Src.Affine[2], MaxY, Src.Affine[4],
+        Src.Affine[5] };
+    OGRGeometryH PLGeom = XYGeomToPLGeom(CutPolygon, NumPoints, Src.Affine,
+                                         Src.XSize, Src.YSize);
     
     // Creates output image
     
@@ -131,7 +134,8 @@ RasterCut(char* DstRaster, char** SrcRasterList, int NumSrcRasters, v2* CutPolyg
     CreateOptions = CSLSetNameValue(CreateOptions, "COMPRESS", "LZW");
     GDALRasterBandH Band = GDALGetRasterBand(Src.DS, 1);
     GDALDataType DType = GDALGetRasterDataType(Band);
-    DstDS = GDALCreate(Driver, DstRaster, DstXSize, DstYSize, Src.NumBands, DType, CreateOptions);
+    DstDS = GDALCreate(Driver, DstRaster, DstXSize, DstYSize, Src.NumBands,
+                       DType, CreateOptions);
     CSLDestroy(CreateOptions);
     
     GDALSetProjection(DstDS, Src.Proj);
@@ -159,7 +163,8 @@ RasterCut(char* DstRaster, char** SrcRasterList, int NumSrcRasters, v2* CutPolyg
         WarpOptions->panDstBands[BandIdx-1] = BandIdx;
     }
     WarpOptions->hCutline = PLGeom;
-    WarpOptions->pTransformerArg = GDALCreateGenImgProjTransformer(Src.DS, 0, DstDS, 0, FALSE, 0, 1);
+    WarpOptions->pTransformerArg = GDALCreateGenImgProjTransformer(Src.DS, 0, DstDS, 0,
+                                                                   FALSE, 0, 1);
     WarpOptions->pfnTransformer = GDALGenImgProjTransform;
     
     GDALWarpOperation Warp;
