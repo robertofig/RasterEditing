@@ -1,4 +1,3 @@
-#include "gdal_priv.h"
 #include "gdal_utils.h"
 #include "ogr_api.h"
 #include "gdalwarper.h"
