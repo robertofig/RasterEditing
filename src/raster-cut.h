@@ -10,6 +10,8 @@
 #define RASTER_CUT_H
 
 #include "gdal.h"
+#include "gdal_priv.h"
+
 #include "geotypes-base.h"
 
 external GDALDatasetH RasterCut(char* DstRaster, char** SrcRasterList, int NumSrcRasters,
